@@ -1,12 +1,16 @@
 {
-  "id": "token-action-hud-template",
-  "title": "Token Action HUD Template",
+  "id": "token-action-hud-l5r5e",
+  "title": "Token Action HUD L5R 5e",
   "description": "Token Action HUD is a repositionable HUD of actions for a selected token",
   "authors": [
     {
       "name": "Larkinabout",
       "url": "https://github.com/Larkinabout"
-    }
+    },
+    {
+      "name": "EduardoBugs",
+      "url": "https://github.com/EduardoBugs"
+    }    
   ],
   "url": "This is auto replaced",
   "flags": {},
@@ -34,12 +38,12 @@
   "relationships": {
     "systems": [
       {
-        "id": "template",
+        "id": "l5r5e",
         "type": "system",
         "compatibility": [
           {
-            "minimum": "1.0.0",
-            "verified": "1.0.0"
+            "minimum": "1.11.0",
+            "verified": "1.11.0"
           }
         ]
       }
