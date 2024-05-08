@@ -2,7 +2,7 @@
  * Module-based constants
  */
 export const MODULE = {
-    ID: 'token-action-hud-template'
+    ID: 'token-action-hud-l5r5e'
 }
 
 /**
@@ -50,4 +50,50 @@ export const ITEM_TYPE = {
     equipment: { groupId: 'equipment' },
     treasure: { groupId: 'treasure' },
     weapon: { groupId: 'weapons' }
+}
+
+/**
+ * Item Qualities
+ */
+export const ITEM_QUALITIES = {
+  razor_edged: 'Razor-Edged',
+  ceremonial: 'Ceremonial',
+  damaged: 'Damaged',
+  destroyed: 'Destroyed',
+  concealable: 'Concealable',
+  cumbersome: 'Cumbersome',
+  snaring: 'Snaring',
+  unholy: 'Unholy',
+  forbidden: 'Forbidden',
+  resplendent: 'Resplendent',
+  wargear: 'Wargear',
+  mundane: 'Mundane',
+  prepare: 'Prepare',
+  sacred: 'Sacred',
+  durable: 'Durable',
+  subtle: 'Subtle',
+  kenzo_blade: 'Kenzō Blade'
+}
+
+/**
+ * Item Patterns
+ */
+export const ITEM_PATTERN = {
+  jade_inlay: 'Shirogane Jade Inlay',
+  uchema: 'Uchema’s Technique',
+  yasunori: 'Yasunori Steel',
+  akodo: 'Akodo Pattern',
+  burning_water: 'Burning Watter Pattern',
+  concealment: 'Concealment Pattern',
+  deadly_fangs: 'Deadly Fangs Pattern',
+  fearsome_snarl: 'Fearsome Snarl Pattern',
+  ichiro: 'Ichirō Pattern',
+  mountain_silk: 'Mountain Silk Pattern',
+  screaming_fire: 'Screaming Fire Pattern',
+  toriyama: 'Toriyama Endurance Pattern',
+  qamarist: 'Spirit of the Qamarist Pattern',
+  yodhaniya: 'Ghostlands Yodhaniya Pattern',
+  kokejin: 'Kökejin’s Heart of the Wind Pattern',
+  agasha: 'Agasha Pattern'
+
 }

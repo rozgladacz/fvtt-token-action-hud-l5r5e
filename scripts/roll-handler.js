@@ -15,6 +15,10 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         async handleActionClick (event, encodedValue) {
             const [actionTypeId, actionId] = encodedValue.split('|')
 
+            console.log(actionTypeId)
+            console.log(this.isRenderItem())
+            console.log(this.actor)
+
             const renderable = ['item']
 
             if (renderable.includes(actionTypeId) && this.isRenderItem()) {
