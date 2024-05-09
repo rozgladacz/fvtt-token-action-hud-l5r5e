@@ -12,9 +12,9 @@
       "url": "https://github.com/EduardoBugs"
     }    
   ],
-  "url": "This is auto replaced",
+  "url": "https://github.com/EduardoBugs/fvtt-token-action-hud-l5r5e",
   "flags": {},
-  "version": "1.0.3",
+  "version": "1.0.5",
   "compatibility": {
     "minimum": "10",
     "verified": "11.315"
@@ -25,7 +25,7 @@
   "scripts": [
   ],
   "styles": [
-    "./styles/tah-l5r5e.css"
+    "./styles/tah-l5r5e-style.css"
   ],
   "languages": [
     {
