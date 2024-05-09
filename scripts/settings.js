@@ -5,17 +5,17 @@ import { MODULE } from './constants.js'
  * Called by Token Action HUD Core to register Token Action HUD system module settings
  * @param {function} coreUpdate Token Action HUD Core update function
  */
-export function register (coreUpdate) {
-    game.settings.register(MODULE.ID, 'displayUnequipped', {
-        name: game.i18n.localize('tokenActionHud.template.settings.displayUnequipped.name'),
-        hint: game.i18n.localize('tokenActionHud.template.settings.displayUnequipped.hint'
-        ),
-        scope: 'client',
-        config: true,
-        type: Boolean,
-        default: true,
-        onChange: (value) => {
-            coreUpdate(value)
-        }
-    })
+export function register(coreUpdate) {
+  game.settings.register(MODULE.ID, 'displayUnequipped', {
+    name: game.i18n.localize('tokenActionHud.l5r5e.settings.displayUnequipped.name'),
+    hint: game.i18n.localize('tokenActionHud.l5r5e.settings.displayUnequipped.hint'
+    ),
+    scope: 'client',
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: (value) => {
+      coreUpdate(value)
+    }
+  })
 }

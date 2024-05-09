@@ -555,14 +555,22 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         ...entity.system?.equippableItemCardProperties ?? [],
         ...entity.system?.activatedEffectCardProperties ?? []
       ].filter(p => p)
+      const type = entity?.type
       const rarity = entity?.system?.rarity ?? null
-      const traits = (entity?.type === 'weapon') ? this.#getItemQualities(entity?.system?.properties) : null
-      return { name, description, modifiers, properties, rarity, traits }
+      const traits = this.#getItemQualities(entity?.system?.properties)
+      const range = (entity?.type === 'weapon') ? entity?.system?.range : null
+      const damage = (entity?.type === 'weapon') ? entity?.system?.damage : null
+      const deadliness = (entity?.type === 'weapon') ? entity?.system?.deadliness : null
+      const grip1 = (entity?.type === 'weapon') ? entity?.system?.grip_1 : null
+      const grip2 = (entity?.type === 'weapon') ? entity?.system?.grip_2 : null
+      const physical = (entity?.type === 'armor') ? entity?.system?.armor?.physical : null
+      const supernatural = (entity?.type === 'armor') ? entity?.system?.armor?.supernatural : null
+      return { name, type, description, modifiers, properties, rarity, traits, range, damage, deadliness, grip1, grip2, physical, supernatural }
     }
 
-    #getItemQualities(weaponProperties) {
-      if (!weaponProperties) return null
-      return Object.entries(weaponProperties)
+    #getItemQualities(itemProperties) {
+      if (!itemProperties) return null
+      return Object.entries(itemProperties)
         .map(([_id, quality]) => {
           return quality.name
         })
@@ -587,56 +595,20 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         await TextEditor.enrichHTML(coreModule.api.Utils.i18n(tooltipData?.description ?? ''), { async: true })
 
       const rarityHtml = tooltipData?.rarity
-        ? `<span class="tah-tag legendary">${tooltipData.rarity}</span>`
+        ? `<div class="tah-tags-wrapper"><span class="tah-tag ${this.#getItemRarity(tooltipData.rarity)}">Rarity: ${tooltipData.rarity}</span></div>`
         : ''
-
-      // const propertiesHtml = tooltipData?.properties
-      //     ? `<div class="tah-properties">${tooltipData.properties.map(property => `<span class="tah-property">${coreModule.api.Utils.i18n(property)}</span>`).join('')}</div>`
-      //     : ''
 
       const propertiesHtml = tooltipData?.traits
         ? `<div class="tah-properties">${tooltipData.traits.map(trait => `<span class="tah-property">${trait}</span>`).join('')}</div>`
         : ''
 
-      // const traitsHtml = tooltipData?.traits
-      //     ? tooltipData.traits.map(trait => `<span class="tah-tag">${trait}</span>`).join('')
-      //     : ''
+      const weaponStatsHtml = tooltipData.type === "weapon" ? this.#getWeaponStats(tooltipData) : ''
+      const gripModHtml = tooltipData.type === "weapon" ? this.#getGripMod(tooltipData) : ''
+      const armorStatsHtml = tooltipData.type === "armor" ? this.#getArmorStats(tooltipData) : ''
 
-      // const traitsHtml = tooltipData?.traits
-      //     ? tooltipData.traits.map(trait => `<span class="tah-tag">${coreModule.api.Utils.i18n(trait.label ?? trait)}</span>`).join('')
-      //     : ''
+      const modifiersHtml = ''
 
-      // const traits2Html = tooltipData?.traits2
-      //     ? tooltipData.traits2.map(trait => `<span class="tah-tag tah-tag-secondary">${coreModule.api.Utils.i18n(trait.label ?? trait)}</span>`).join('')
-      //     : ''
-
-      // const traits2Html = tooltipData?.traits
-      //     ? tooltipData.traits.map(trait => `<span class="tah-tag tah-tag-secondary">${trait}</span>`).join('')
-      //     : ''                
-
-      // const traitsAltHtml = tooltipData?.traitsAlt
-      //     ? tooltipData.traitsAlt.map(trait => `<span class="tah-tag tah-tag-alt">${coreModule.api.Utils.i18n(trait.label)}</span>`).join('')
-      //     : ''
-
-      // const traitsAltHtml = tooltipData?.traits
-      //     ? tooltipData.traits.map(trait => `<span class="tah-tag tah-tag-alt">${trait}</span>`).join('')
-      //     : ''                
-
-      // const modifiersHtml = tooltipData?.modifiers
-      //     ? `<div class="tah-tags">${tooltipData.modifiers.filter(modifier => modifier.enabled).map(modifier => {
-      //         const label = coreModule.api.Utils.i18n(modifier.label)
-      //         const sign = modifier.modifier >= 0 ? '+' : ''
-      //         const mod = `${sign}${modifier.modifier ?? ''}`
-      //         return `<span class="tah-tag tah-tag-transparent">${label} ${mod}</span>`
-      //     }).join('')}</div>`
-      //     : ''
-
-      const traitsHtml = `<span class="tah-tag">traitsHtml</span>`
-      const traits2Html = `<span class="tah-tag tah-tag-secondary">traits2Html</span>`
-      const traitsAltHtml = `<span class="tah-tag tah-tag-alt">traitsAltHtml</span>`
-      const modifiersHtml = `<div class="tah-tags"><span class="tah-tag tah-tag-transparent">modifiersHtml</span></div>`
-
-      const tagsJoined = [rarityHtml, traitsHtml, traits2Html, traitsAltHtml].join('')
+      const tagsJoined = [rarityHtml, weaponStatsHtml, gripModHtml, armorStatsHtml].join('')
 
       const tagsHtml = (tagsJoined) ? `<div class="tah-tags">${tagsJoined}</div>` : ''
 
@@ -645,6 +617,35 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
       if (!description && !tagsHtml && !modifiersHtml) return name
 
       return `<div>${nameHtml}${headerTags}${description}${propertiesHtml}</div>`
+    }
+
+    #getItemRarity(rarity) {
+      if (!rarity) return ''
+      if (rarity < 3) return 'common'
+      if (rarity < 5) return 'uncommon'
+      if (rarity < 7) return 'rare'
+      if (rarity < 9) return 'veryRare'
+      if (rarity == 9) return 'legendary'
+      if (rarity == 10) return 'artifact'
+    }
+
+    #getWeaponStats(tooltipData) {
+      const range = `<span class="tah-tag">Range: ${tooltipData.range}</span>`
+      const damage = `<span class="tah-tag">Damage: ${tooltipData.damage}</span>`
+      const deadliness = `<span class="tah-tag">Deadliness: ${tooltipData.deadliness}</span>`
+      return [range, damage, deadliness].join('')
+    }
+
+    #getGripMod(tooltipData) {
+      const grip1 = tooltipData.grip1 && tooltipData.grip1 !== 'N/A' ? `<span class="tah-tag">1-hand: ${tooltipData.grip1}</span>` : ''
+      const grip2 = tooltipData.grip2 && tooltipData.grip2 !== 'N/A' ? `<span class="tah-tag">2-hand: ${tooltipData.grip2}</span>` : ''
+      return [grip1, grip2].join('')
+    }
+
+    #getArmorStats(tooltipData) {
+      const physical = tooltipData?.physical && tooltipData?.physical > 0 ? `<span class="tah-tag">Physical: ${tooltipData?.physical}</span>` : ''
+      const supernatural = tooltipData?.supernatural && tooltipData?.supernatural > 0 ? `<span class="tah-tag">Supernatural: ${tooltipData?.supernatural}</span>` : ''
+      return [physical, supernatural].join('')
     }
   }
 })

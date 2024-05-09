@@ -15,7 +15,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
     async handleActionClick(event, encodedValue) {
       const [actionTypeId, actionId] = encodedValue.split('|')
 
-      const renderable = ['item']
+      const renderable = ['item', 'weapons', 'technique', 'armor']
 
       if (renderable.includes(actionTypeId) && this.isRenderItem()) {
         return this.doRenderItem(this.actor, actionId)
@@ -67,7 +67,6 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
      * @param {string} actionId     The actionId
      */
     async #handleAction(event, actor, token, actionTypeId, actionId) {
-      console.log(actionTypeId)
       switch (actionTypeId) {
         case 'weapons':
           this.#handleWeaponAction(event, actor, actionId)
@@ -99,7 +98,6 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
      */
     #handleItemAction(event, actor, actionId) {
       const item = actor.items.get(actionId)
-      console.log(item)
       item.toChat(event)
     }
 
