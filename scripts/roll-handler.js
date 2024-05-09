@@ -75,6 +75,12 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         case 'ring':
           this.#handleRingAction(event, actor, actionId)
           break
+        case 'skill':
+          this.#handleSkillAction(event, actor, actionId)
+          break
+        case 'technique':
+          this.#handleTechniqueAction(event, actor, actionId)
+          break
         case 'item':
           this.#handleItemAction(event, actor, actionId)
           break
@@ -104,9 +110,8 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleWeaponAction(event, actor, actionId) {
+    #handleWeaponAction(_event, actor, actionId) {
       const weapon = actor.items.get(actionId)
-
       new game.l5r5e.DicePickerDialog({
         skillId: weapon.system.skill
       }).render(true);
@@ -122,6 +127,40 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
     #handleRingAction(_event, _actor, actionId) {
       new game.l5r5e.DicePickerDialog({
         ringId: actionId
+      }).render(true);
+    }
+
+    /**
+     * Handle skill action
+     * @private
+     * @param {object} event    The event
+     * @param {object} actor    The actor
+     * @param {string} actionId The action id
+     */
+    #handleSkillAction(_event, _actor, actionId) {
+      new game.l5r5e.DicePickerDialog({
+        skillId: actionId
+      }).render(true);
+    }
+
+    /**
+     * Handle technique action
+     * @private
+     * @param {object} event    The event
+     * @param {object} actor    The actor
+     * @param {string} actionId The action id
+     */
+    #handleTechniqueAction(_event, actor, actionId) {
+      const technique = actor.items.get(actionId)
+
+      if (!technique || technique.type !== "technique" || !technique.system.skill) {
+        return;
+      }
+
+      new game.l5r5e.DicePickerDialog({
+        skillsList: technique.system.skill,
+        ringId: technique.system.ring,
+        difficulty: technique.system.difficulty
       }).render(true);
     }
 

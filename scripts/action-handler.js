@@ -244,17 +244,15 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
             try {
               const id = skill[0]
               const encodedValue = [actionType, id].join(this.delimiter)
-              const name = `${coreModule.api.Utils.i18n(`l5r5e.skills.${groupId}.${id}`)}: ` ?? ''
+              const value = skill[1]
+              const name = `${coreModule.api.Utils.i18n(`l5r5e.skills.${groupId}.${id}`)}: ${value}` ?? ''
               const actionTypeName = `${coreModule.api.Utils.i18n('l5r5e.skills.label')}: ` ?? ''
               const listName = `${actionTypeName}${name}`
-              const value = skill[1]
-              const info1 = (this.actor) ? { text: (value || value === 0) ? `${value}` : '' } : ''
 
               return {
                 id,
                 name,
                 encodedValue,
-                info1,
                 listName
               }
             } catch (error) {
@@ -302,7 +300,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         const techniques = techniqueMap.get(groupId)
 
         // Build actions
-        await this.#buildActions(techniques, groupData)
+        await this.#buildActions(techniques, groupData, 'technique')
       }
     }
 
