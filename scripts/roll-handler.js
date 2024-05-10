@@ -17,8 +17,17 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
 
       const renderable = ['item', 'weapons', 'technique', 'armor']
 
+      const rightClickAction = ['ring']
+
       if (renderable.includes(actionTypeId) && this.isRenderItem()) {
         return this.doRenderItem(this.actor, actionId)
+      }
+
+      if (rightClickAction.includes(actionTypeId) && this.isRenderItem()) {
+        if (actionTypeId === 'ring') {
+          await this.#handleStanceChangeAction(event, this.actor, actionId)
+          return
+        }
       }
 
       const knownCharacters = ['character']
@@ -80,8 +89,11 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         case 'technique':
           this.#handleTechniqueAction(event, actor, actionId)
           break
-        case 'item':
-          this.#handleItemAction(event, actor, actionId)
+        case 'armor':
+          await this.#handleItemAction(event, actor, actionId)
+          break
+        case 'equipment':
+          await this.#handleItemAction(event, actor, actionId)
           break
         case 'utility':
           this.#handleUtilityAction(token, actionId)
@@ -96,9 +108,25 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleItemAction(event, actor, actionId) {
+    async #handleItemAction(event, actor, actionId) {
       const item = actor.items.get(actionId)
-      item.toChat(event)
+      await game.l5r5e.HelpersL5r5e.sendToChat(item)
+    }
+
+    /**
+     * Handle stance change action
+     * @private
+     * @param {object} event    The event
+     * @param {object} actor    The actor
+     * @param {string} actionId The action id
+     */
+    async #handleStanceChangeAction(_event, actor, actionId) {
+      //console.log(game.l5r5e)
+      // if (actor.system.stance !== actionId) {
+      //   await new game.l5r5e.ActorL5r5e(actor).update({
+      //     stance: actionId
+      //   })
+      // }
     }
 
     /**

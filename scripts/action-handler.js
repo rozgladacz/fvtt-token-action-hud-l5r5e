@@ -20,6 +20,12 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
       this.actors = (!this.actor) ? this.#getActors() : [this.actor]
       this.tokens = (!this.token) ? this.#getTokens() : [this.token]
 
+
+      // BUGS
+      //console.log(game.l5r5e)
+      // // Combat Skill
+      // console.log(CONFIG.l5r5e.initiativeSkills[game.settings.get(CONFIG.l5r5e.namespace, "initiative-encounter")])
+
       this.actorType = this.actor?.type
 
       // Settings
@@ -37,14 +43,6 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
           'armor',
           'equipment',
           'weapons'
-        ]
-
-        this.skillGroupIds = [
-          'artisan',
-          'martial',
-          'scholar',
-          'social',
-          'trade'
         ]
 
         this.techniqueGroupIds = [
@@ -102,7 +100,6 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         const equipped = value.system.equipped
         const hasQuantity = value.system?.quantity > 0
         const isEquippedItem = this.#isEquippedItem(value)
-        const isReadiedItem = this.#isReadiedItem(value)
         const type = value.type
 
         // Set items into maps
@@ -166,10 +163,13 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
       const actionType = 'ring'
 
       // Get rings
-      const rings = this.actor.system.rings
+      const rings = game.l5r5e.HelpersL5r5e.getRingsList(this.actor)
 
       // Exit if there are no rings
       if (rings.length === 0) return
+
+      // Get Stance
+      const stance = this.actor.system.stance
 
       // Create group data
       const groupData = {
@@ -179,28 +179,29 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
       }
 
       // Get actions
-      const actions = Object.entries(rings)
+      const actions = Object.values(rings)
         .map((ring) => {
           try {
-            const id = ring[0]
+            const id = ring.id
             const encodedValue = [actionType, id].join(this.delimiter)
-            const name = `${coreModule.api.Utils.i18n(`l5r5e.rings.${id}`)}: ${ring[1]}` ?? ''
-            const value = ring[1]
-            const actionTypeName = `${coreModule.api.Utils.i18n('l5r5e.rings.label')}:` ?? ''
+            const name = `${coreModule.api.Utils.i18n(`l5r5e.rings.${id}`)}: ${ring.value}` ?? ''
+            const actionTypeName = `${ring.label}:` ?? ''
             const listName = `${actionTypeName}${name}`
-            const info1 = (this.actor) ? { text: (value || value === 0) ? `${value}` : '' } : ''
             const img = coreModule.api.Utils.getImage(`systems/l5r5e/assets/icons/rings/${id}.svg`)
 
-            // BUGS
-            const info2 = 'info2'
-            const tooltip = 'tooltip info'
+            const tooltip = `${coreModule.api.Utils.i18n(`l5r5e.conflict.stances.${id}tip`)}`
+
+            let cssClass = ''
+            if (id === stance) {
+              cssClass = `toggle active`
+            }
 
             return {
               id,
               name,
               img,
               encodedValue,
-              info2,
+              cssClass,
               tooltip,
               listName
             }
@@ -223,47 +224,42 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
       if (this.actorType !== 'character') return
 
       const actionType = 'skill'
+      const categoriesSkillsList = game.l5r5e.HelpersL5r5e.getCategoriesSkillsList()
 
-      for (const groupId of this.skillGroupIds) {
-        // Get skills
-        const skills = this.actor.system.skills[groupId]
+      for (const [catId, skills] of categoriesSkillsList) {
+        try {
+          // Create group data
+          const groupData = {
+            id: catId,
+            name: `${coreModule.api.Utils.i18n(`l5r5e.skills.${catId}.title`)}` ?? catId,
+            type: 'system'
+          }
 
-        // Exit if there are no skills
-        if (skills.length === 0) return
+          // Create actions list
+          const actions = Object.entries(skills).map((skill) => {
+            const id = skill[1]
+            const encodedValue = [actionType, id].join(this.delimiter)
+            const value = this.actor.system.skills[catId][id]
+            const name = `${coreModule.api.Utils.i18n(`l5r5e.skills.${catId}.${id}`)}: ${value}` ?? ''
+            const actionTypeName = `${coreModule.api.Utils.i18n('l5r5e.skills.label')}: ` ?? ''
+            const listName = `${actionTypeName}${name}`
 
-        // Create group data
-        const groupData = {
-          id: groupId,
-          name: `${coreModule.api.Utils.i18n(`l5r5e.skills.${groupId}.title`)}` ?? groupId,
-          type: 'system'
-        }
-
-        // Get actions
-        const actions = Object.entries(skills)
-          .map((skill) => {
-            try {
-              const id = skill[0]
-              const encodedValue = [actionType, id].join(this.delimiter)
-              const value = skill[1]
-              const name = `${coreModule.api.Utils.i18n(`l5r5e.skills.${groupId}.${id}`)}: ${value}` ?? ''
-              const actionTypeName = `${coreModule.api.Utils.i18n('l5r5e.skills.label')}: ` ?? ''
-              const listName = `${actionTypeName}${name}`
-
-              return {
-                id,
-                name,
-                encodedValue,
-                listName
-              }
-            } catch (error) {
-              coreModule.api.Logger.error(skill)
-              return null
+            return {
+              id,
+              name,
+              encodedValue,
+              listName
             }
           })
-          .filter((skill) => !!skill)
 
-        // Add actions to HUD
-        this.addActions(actions, groupData)
+          // Add actions to HUD
+          this.addActions(actions, groupData)
+
+        } catch (error) {
+          coreModule.api.Logger.error(catId)
+          return null
+        }
+
       }
     }
 
@@ -348,21 +344,6 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
       if (this.showUnequippedItems && !excludedTypes.includes(type)) return true
       const equipped = item.system.equipped
       if (equipped) return true
-      return false
-    }
-
-    /**
-     * Is readied item
-     * @private
-     * @param {object} item
-     * @returns {boolean}
-     */
-    #isReadiedItem(item) {
-      const type = item.type
-      const excludedTypes = ['armor', 'item', 'technique', 'peculiarity']
-      if (excludedTypes.includes(type)) return false
-      const readied = item.system.readied
-      if (readied) return true
       return false
     }
 
@@ -630,21 +611,21 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
     }
 
     #getWeaponStats(tooltipData) {
-      const range = `<span class="tah-tag">Range: ${tooltipData.range}</span>`
-      const damage = `<span class="tah-tag">Damage: ${tooltipData.damage}</span>`
-      const deadliness = `<span class="tah-tag">Deadliness: ${tooltipData.deadliness}</span>`
+      const range = `<span class="tah-tag">${coreModule.api.Utils.i18n(`l5r5e.weapons.range`)}: ${tooltipData.range}</span>`
+      const damage = `<span class="tah-tag">${coreModule.api.Utils.i18n(`l5r5e.weapons.damage`)}: ${tooltipData.damage}</span>`
+      const deadliness = `<span class="tah-tag">${coreModule.api.Utils.i18n(`l5r5e.weapons.deadliness`)}: ${tooltipData.deadliness}</span>`
       return [range, damage, deadliness].join('')
     }
 
     #getGripMod(tooltipData) {
-      const grip1 = tooltipData.grip1 && tooltipData.grip1 !== 'N/A' ? `<span class="tah-tag">1-hand: ${tooltipData.grip1}</span>` : ''
-      const grip2 = tooltipData.grip2 && tooltipData.grip2 !== 'N/A' ? `<span class="tah-tag">2-hand: ${tooltipData.grip2}</span>` : ''
+      const grip1 = tooltipData.grip1 && tooltipData.grip1 !== 'N/A' ? `<span class="tah-tag">${coreModule.api.Utils.i18n(`l5r5e.weapons.1hand`)}: ${tooltipData.grip1}</span>` : ''
+      const grip2 = tooltipData.grip2 && tooltipData.grip2 !== 'N/A' ? `<span class="tah-tag">${coreModule.api.Utils.i18n(`l5r5e.weapons.2hand`)}: ${tooltipData.grip2}</span>` : ''
       return [grip1, grip2].join('')
     }
 
     #getArmorStats(tooltipData) {
-      const physical = tooltipData?.physical && tooltipData?.physical > 0 ? `<span class="tah-tag">Physical: ${tooltipData?.physical}</span>` : ''
-      const supernatural = tooltipData?.supernatural && tooltipData?.supernatural > 0 ? `<span class="tah-tag">Supernatural: ${tooltipData?.supernatural}</span>` : ''
+      const physical = tooltipData?.physical && tooltipData?.physical > 0 ? `<span class="tah-tag">${coreModule.api.Utils.i18n(`l5r5e.armors.physical`)}: ${tooltipData?.physical}</span>` : ''
+      const supernatural = tooltipData?.supernatural && tooltipData?.supernatural > 0 ? `<span class="tah-tag">${coreModule.api.Utils.i18n(`l5r5e.armors.supernatural`)}: ${tooltipData?.supernatural}</span>` : ''
       return [physical, supernatural].join('')
     }
   }
