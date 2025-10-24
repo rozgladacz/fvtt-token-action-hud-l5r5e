@@ -11,23 +11,33 @@ Token Action HUD is a repositionable HUD of actions for a selected token.
 - Unlock the HUD to customise layout and groups per user, and actions per actor.
 - Add your own macros, journal entries and roll table compendiums.
 
+# Wymagania
+
+- Foundry VTT v13+
+- [Token Action HUD Core](https://foundryvtt.com/packages/token-action-hud-core) w wersji co najmniej 2.0.12
+- [socketlib](https://foundryvtt.com/packages/socketlib)
+
 # Installation
+
+Przed instalacją upewnij się, że korzystasz z Foundry VTT w wersji 13 lub wyższej i masz zainstalowane wymagane moduły wymienione w sekcji powyżej.
 
 ## Method 1
 1. On Foundry VTT's **Configuration and Setup** screen, go to **Add-on Modules**
 2. Click **Install Module**
 3. Search for **Token Action HUD L5r5e** 
 4. Click **Install** next to the module listing
+5. Install or update the required modules (Token Action HUD Core ≥2.0.12, socketlib) if prompted
 
 ## Method 2
 1. On Foundry VTT's **Configuration and Setup** screen, go to **Add-on Modules**
 2. Click **Install Module**
 3. In the Manifest URL field, paste: `https://github.com/EduardoBugs/fvtt-token-action-hud-l5r5e/releases/latest/download/module.json`
 4. Click **Install** next to the pasted Manifest URL
+5. Install or update the required modules (Token Action HUD Core ≥2.0.12, socketlib) if prompted
 
 ## Required Modules
 
-**IMPORTANT** - Token Action HUD Template requires the [Token Action HUD Core](https://foundryvtt.com/packages/token-action-hud-core) module to be installed.
+**IMPORTANT** - Token Action HUD Template requires the [Token Action HUD Core](https://foundryvtt.com/packages/token-action-hud-core) module (version 2.0.12 or newer) and the [socketlib](https://foundryvtt.com/packages/socketlib) module to be installed.
 
 ## Recommended Modules
 Token Action HUD uses the [Color Picker](https://foundryvtt.com/packages/color-picker) library module for its color picker settings.
@@ -43,6 +53,12 @@ Pull requests are welcome. Please include a reason for the request or create an 
 # Acknowledgements
 
 Thank you to the Community Helpers on Foundry's Discord who provide tireless support for people seeking help with the HUD.
+
+# Release Notes
+
+## 1.1.0
+
+- v13 compatibility, TAH Core 2.x
 
 # License
 
