@@ -1,14 +1,22 @@
 import { SystemManager } from './system-manager.js'
 import { MODULE, REQUIRED_CORE_MODULE_VERSION } from './constants.js'
+import { getCoreApi } from './core-api.js'
 
-Hooks.on('tokenActionHudCoreApiReady', async () => {
-    /**
-     * Return the SystemManager and requiredCoreModuleVersion to Token Action HUD Core
-     */
-    const module = game.modules.get(MODULE.ID)
-    module.api = {
-        requiredCoreModuleVersion: REQUIRED_CORE_MODULE_VERSION,
-        SystemManager
+Hooks.once('init', () => {
+  try {
+    const coreApi = getCoreApi()
+
+    if (typeof coreApi.registerSystem !== 'function') {
+      console.error('Token Action HUD Core API does not provide registerSystem. Please update Token Action HUD Core to version 2.x.')
+      return
     }
-    Hooks.call('tokenActionHudSystemReady', module)
+
+    coreApi.registerSystem({
+      moduleId: MODULE.ID,
+      requiredCoreModuleVersion: REQUIRED_CORE_MODULE_VERSION,
+      SystemManager
+    })
+  } catch (error) {
+    console.error('Failed to register Token Action HUD L5R5E system with Token Action HUD Core.', error)
+  }
 })

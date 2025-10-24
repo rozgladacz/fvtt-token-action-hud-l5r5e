@@ -1,17 +1,12 @@
-// System Module Imports
 import { ActionHandler } from './action-handler.js'
-import { RollHandler as Core } from './roll-handler.js'
-import { MODULE } from './constants.js'
+import { RollHandler } from './roll-handler.js'
 import { DEFAULTS } from './defaults.js'
 import * as systemSettings from './settings.js'
+import { getCoreApi } from './core-api.js'
 
-export let SystemManager = null
+const coreApi = getCoreApi()
 
-Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
-  /**
-   * Extends Token Action HUD Core's SystemManager class
-   */
-  SystemManager = class SystemManager extends coreModule.api.SystemManager {
+export class SystemManager extends coreApi.SystemManager {
     /**
      * Returns an instance of the ActionHandler to Token Action HUD Core
      * Called by Token Action HUD Core
@@ -47,7 +42,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
       switch (rollHandlerId) {
         case 'core':
         default:
-          rollHandler = new Core()
+          rollHandler = new RollHandler()
           break
       }
       return rollHandler
@@ -71,6 +66,4 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
     registerSettings(coreUpdate) {
       systemSettings.register(coreUpdate)
     }
-
-  }
-})
+}

@@ -1,10 +1,8 @@
-export let RollHandler = null
+import { getCoreApi } from './core-api.js'
 
-Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
-  /**
-   * Extends Token Action HUD Core's RollHandler class and handles action events triggered when an action is clicked
-   */
-  RollHandler = class RollHandler extends coreModule.api.RollHandler {
+const coreApi = getCoreApi()
+
+export class RollHandler extends coreApi.RollHandler {
     /**
      * Handle action click
      * Called by Token Action HUD Core when an action is left or right-clicked
@@ -205,5 +203,4 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
           break
       }
     }
-  }
-})
+}
