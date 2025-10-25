@@ -335,7 +335,7 @@ export function createActionHandlerClass(api) {
     #isEquippedItem(item) {
       const type = item.type
       const excludedTypes = ['item', 'technique', 'peculiarity']
-      if (this.showUnequippedItems && !excludedTypes.includes(type)) return true
+      if (this.displayUnequipped && !excludedTypes.includes(type)) return true
       const equipped = item.system.equipped
       if (equipped) return true
       return false
