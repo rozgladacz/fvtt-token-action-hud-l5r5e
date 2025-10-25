@@ -33,11 +33,9 @@ export function createActionHandlerClass(api) {
         this.items = items
 
         this.inventoryGroups = this.#createEntryMap(getInventoryGroupEntries())
-        this.inventorygroupIds = [...this.inventoryGroups.keys()]
 
         const techniqueEntries = getTechniqueTypeEntries()
         this.techniqueGroups = this.#createEntryMap(techniqueEntries)
-        this.techniqueGroupIds = [...this.techniqueGroups.keys()]
         this.techniqueTypeKeys = new Set(techniqueEntries.flatMap((entry) => [entry.actorKey ?? entry.id, entry.id]))
       }
 
@@ -216,11 +214,13 @@ export function createActionHandlerClass(api) {
       }
 
       // Loop through inventory subcateogry ids
-      for (const groupId of this.inventorygroupIds) {
-        if (!inventoryMap.has(groupId)) continue
+      const knownGroupIds = this.inventoryGroups ? [...this.inventoryGroups.keys()] : []
+      const inventoryGroupIds = [...inventoryMap.keys()]
+      const groupIds = [...new Set([...knownGroupIds, ...inventoryGroupIds])]
 
+      for (const groupId of groupIds) {
         const inventory = inventoryMap.get(groupId)
-        if (!inventory) continue
+        if (!inventory || inventory.size === 0) continue
 
         const groupData = this.#getGroupData(groupId, this.inventoryGroups)
 
@@ -472,22 +472,24 @@ export function createActionHandlerClass(api) {
 
         if (isTechnique) {
           const technique_type = sanitizeId(value.system.technique_type)
+          if (!technique_type) continue
 
           if (!techniqueMap.has(technique_type)) techniqueMap.set(technique_type, new Map())
           techniqueMap.get(technique_type).set(key, value)
         }
       }
 
-      const groupIds = [...new Set([...this.techniqueGroupIds, ...techniqueMap.keys()])]
+      const knownGroupIds = this.techniqueGroups ? [...this.techniqueGroups.keys()] : []
+      const techniqueGroupIds = [...techniqueMap.keys()]
+      const groupIds = [...new Set([...knownGroupIds, ...techniqueGroupIds])]
 
-      // Loop through inventory subcateogry ids
+      // Loop through technique group ids
       for (const groupId of groupIds) {
-        if (!techniqueMap.has(groupId)) continue
+        const techniques = techniqueMap.get(groupId)
+        if (!techniques || techniques.size === 0) continue
 
         // Create group data
         const groupData = this.#getGroupData(groupId, this.techniqueGroups, { fallbackPrefix: 'l5r5e.techniques' })
-
-        const techniques = techniqueMap.get(groupId)
 
         // Build actions
         await this.#buildActions(techniques, groupData, 'technique')
@@ -572,7 +574,7 @@ export function createActionHandlerClass(api) {
       if (!this.actor) return
 
       const { entries, section } = getAttributeEntries(attributeType, this.actor)
-      if (!section || entries.length === 0) return
+      if (entries.length === 0) return
 
       const actions = entries
         .map((entry) => this.#createAttributeAction(entry, section, attributeType))
@@ -586,7 +588,7 @@ export function createActionHandlerClass(api) {
     }
 
     #createAttributeAction(entry, section, attributeType) {
-      const data = this.#resolveAttributeData(section, entry)
+      const data = this.#resolveAttributeData(section, entry, attributeType)
       if (data === undefined) return null
 
       const value = this.#formatAttributeValue(data)
@@ -612,7 +614,8 @@ export function createActionHandlerClass(api) {
       return action
     }
 
-    #resolveAttributeData(section, entry) {
+    #resolveAttributeData(section, entry, attributeType) {
+      const sections = this.#getAttributeSections(section, attributeType)
       const candidatePaths = []
 
       if (entry.path) candidatePaths.push(entry.path)
@@ -624,12 +627,37 @@ export function createActionHandlerClass(api) {
         candidatePaths.push(String(key).replace(/-/g, '_'))
       })
 
-      for (const path of candidatePaths) {
-        const value = this.#getProperty(section, path)
-        if (value !== undefined) return value
+      for (const currentSection of sections) {
+        for (const path of candidatePaths) {
+          const value = this.#getProperty(currentSection, path)
+          if (value !== undefined) return value
+        }
       }
 
       return undefined
+    }
+
+    #getAttributeSections(section, attributeType) {
+      const sections = []
+      if (section && typeof section === 'object') sections.push(section)
+
+      const system = this.actor?.system ?? {}
+      const paths = attributeType === 'standing'
+        ? ['standing', 'social', 'attributes.standing', 'attributes.social']
+        : ['derived', 'derivedAttributes', 'attributes.derived', 'attributes.derivedAttributes']
+
+      for (const path of paths) {
+        const value = this.#getProperty(system, path)
+        if (value && typeof value === 'object' && !sections.includes(value)) {
+          sections.push(value)
+        }
+      }
+
+      if (system && typeof system === 'object' && !sections.includes(system)) {
+        sections.push(system)
+      }
+
+      return sections
     }
 
     #formatAttributeValue(data) {
