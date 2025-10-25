@@ -21,11 +21,11 @@ export function getCoreApiIfAvailable() {
 }
 
 export function resolveCoreApi(payload = null) {
-  if (payload?.registerSystem || payload?.SystemManager) {
+  if (payload?.registerSystem || payload?.registerApi || payload?.SystemManager) {
     return payload
   }
 
-  if (payload?.api?.registerSystem) {
+  if (payload?.api?.registerSystem || payload?.api?.registerApi) {
     return payload.api
   }
 

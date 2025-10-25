@@ -17,19 +17,22 @@ function registerWithCore(payload) {
     return
   }
 
-  if (typeof api.registerSystem !== 'function') {
-    console.error('Token Action HUD Core API does not provide registerSystem. Please update Token Action HUD Core to version 2.x.')
-    return
-  }
-
   try {
     const SystemManager = createSystemManagerClass(api)
-
-    api.registerSystem({
+    const registrationPayload = {
       moduleId: MODULE.ID,
       requiredCoreModuleVersion: REQUIRED_CORE_MODULE_VERSION,
       SystemManager
-    })
+    }
+
+    if (typeof api.registerSystem === 'function') {
+      api.registerSystem(registrationPayload)
+    } else if (typeof api.registerApi === 'function') {
+      api.registerApi(registrationPayload)
+    } else {
+      console.error('Token Action HUD Core API does not provide registerSystem or registerApi. Please update Token Action HUD Core to version 2.x.')
+      return
+    }
 
     systemRegistered = true
     coreApiHookRegistered = false
