@@ -14,7 +14,7 @@
   ],
   "url": "https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e",
   "flags": {},
-  "version": "1.5.0",
+  "version": "2.0.0",
   "compatibility": {
     "minimum": "13",
     "verified": "13"
@@ -68,9 +68,9 @@
     }
   },
   "socket": false,
-  "manifest": "https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/releases/download/v1.5.0/module.json",
-  "download": "https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/releases/download/v1.5.0/module.zip",
-  "readme": "https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/blob/v1.5.0/readme.md",
+  "manifest": "https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/releases/download/v2.0.0/module.json",
+  "download": "https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/releases/download/v2.0.0/module.zip",
+  "readme": "https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/blob/v2.0.0/readme.md",
   "protected": false,
   "coreTranslation": false,
   "library": false
