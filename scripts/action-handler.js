@@ -1,6 +1,7 @@
 
-import { ACTION_TYPE, GROUP, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
+import { ACTION_TYPE, GROUP, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS, MODULE } from './constants.js'
 import { getAttributeEntries, getInventoryGroupEntries, getRingEntries, getTechniqueTypeEntries, sanitizeId, unsanitizeId } from './system-data.js'
+import { Utils as ModuleUtils } from './utils.js'
 
 export function createActionHandlerClass(api) {
   return class ActionHandler extends api.ActionHandler {
@@ -24,7 +25,7 @@ export function createActionHandlerClass(api) {
       this.actorType = this.actor?.type
 
       // Settings
-      this.displayUnequipped = Utils.getSetting('displayUnequipped')
+      this.displayUnequipped = this.#getModuleSetting('displayUnequipped', true)
 
       // Set items variable
       if (this.actor) {
@@ -1299,19 +1300,35 @@ export function createActionHandlerClass(api) {
       }
     }
 
-    #getAttributeGroupData(attributeType) {
-      const groupId = attributeType
-      const nameKey = GROUP?.[groupId]?.name
-      return {
-        id: groupId,
-        name: nameKey ? api.Utils.i18n(nameKey) : groupId,
-        type: 'system'
+      #getAttributeGroupData(attributeType) {
+        const groupId = attributeType
+        const nameKey = GROUP?.[groupId]?.name
+        return {
+          id: groupId,
+          name: nameKey ? api.Utils.i18n(nameKey) : groupId,
+          type: 'system'
+        }
       }
-    }
 
-    #firstDefined(...values) {
-      return values.find((value) => value !== undefined && value !== null)
-    }
+      #getModuleSetting(key, defaultValue = null) {
+        const utilsValue = ModuleUtils?.getSetting?.(key, defaultValue)
+        if (utilsValue !== undefined && utilsValue !== null) {
+          return utilsValue
+        }
+
+        try {
+          const value = game.settings.get(MODULE.ID, key)
+          return value ?? defaultValue
+        } catch (error) {
+          api.Logger?.debug?.(`Setting '${key}' not available for ${MODULE.ID}`, error)
+        }
+
+        return defaultValue
+      }
+
+      #firstDefined(...values) {
+        return values.find((value) => value !== undefined && value !== null)
+      }
 
     #createEntryMap(entries) {
       return new Map(entries.map((entry) => [entry.id, entry]))
