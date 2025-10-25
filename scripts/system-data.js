@@ -59,6 +59,7 @@ export function unsanitizeId(id) {
 export function getTechniqueTypeEntries() {
   const entries = collectEntries({
     helperMethods: ['getTechniqueTypesList', 'getTechniqueTypes', 'getTechniquesTypesList', 'getTechniquesList'],
+    helperArgsSets: [[{}], []],
     configPaths: ['techniqueTypes', 'technique_types', 'techniques.types', 'techniques.categories', 'techniques.type'],
     translationPrefix: 'l5r5e.techniques',
     stringIsTranslation: true,
