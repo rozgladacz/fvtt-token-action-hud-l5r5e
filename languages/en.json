@@ -1,15 +1,10 @@
 {
   "tokenActionHud": {
-    "template": {
-      "armor": "Armor",
-      "equipment": "Equipment",
-      "inventory": "Inventory",
-      "item": "Item",
-      "weapons": "Weapons",
+    "l5r5e": {
       "settings": {
         "displayUnequipped": {
-          "hint": "Choose whether to display unequipped items on the HUD",
-          "name": "Display Unequipped"
+          "name": "Display Unequipped",
+          "hint": "Choose whether to display unequipped items on the HUD"
         }
       }
     }
