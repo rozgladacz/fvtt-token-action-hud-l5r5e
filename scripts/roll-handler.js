@@ -14,11 +14,21 @@ export function createRollHandlerClass(api) {
 
       const rightClickAction = ['ring']
 
-      if (renderable.includes(actionTypeId) && this.isRenderItem()) {
+      const isRenderItem = typeof this.isRenderItem === 'function'
+        ? this.isRenderItem(event)
+        : false
+
+      const isRightClick = isRenderItem
+        || event?.type === 'contextmenu'
+        || event?.button === 2
+        || event?.data?.button === 2
+        || event?.data?.isRightClick === true
+
+      if (renderable.includes(actionTypeId) && isRenderItem) {
         return this.doRenderItem(this.actor, actionId)
       }
 
-      if (rightClickAction.includes(actionTypeId) && this.isRenderItem()) {
+      if (rightClickAction.includes(actionTypeId) && isRightClick) {
         if (actionTypeId === 'ring') {
           await this.#handleStanceChangeAction(event, this.actor, actionId)
           return

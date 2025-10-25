@@ -67,13 +67,15 @@ export function createActionHandlerClass(api) {
      * @returns {object}
      */
     #buildMultipleTokenActions() {
-      const tokens = this.tokens ?? []
+      const tokens = Array.isArray(this.tokens) ? this.tokens : []
       if (tokens.length === 0) return
 
-      const actors = this.actors ?? []
+      const actors = Array.isArray(this.actors) ? this.actors.filter((actor) => !!actor) : []
 
-      // Utility actions available for all controlled tokens
       const utilityActions = []
+      const utilityGroupName = api.Utils.i18n?.('tokenActionHud.utility')
+        ?? game.i18n.localize?.('tokenActionHud.utility')
+        ?? 'Utility'
 
       const endTurnLabel = api.Utils.i18n?.('tokenActionHud.utility.endTurn')
         ?? game.i18n.localize?.('tokenActionHud.utility.endTurn')
@@ -83,13 +85,13 @@ export function createActionHandlerClass(api) {
         id: 'endTurn',
         name: endTurnLabel,
         encodedValue: ['utility', 'endTurn'].join(this.delimiter),
-        listName: `${api.Utils.i18n('tokenActionHud.utility') ?? 'Utility'}: ${endTurnLabel}`
+        listName: `${utilityGroupName}: ${endTurnLabel}`
       })
 
       if (utilityActions.length > 0) {
         const groupData = {
           id: 'utility',
-          name: api.Utils.i18n('tokenActionHud.utility') ?? 'Utility',
+          name: utilityGroupName,
           type: 'system'
         }
 
@@ -98,22 +100,24 @@ export function createActionHandlerClass(api) {
 
       if (actors.length === 0) return
 
-      const primaryActor = actors.find((actor) => !!actor)
+      const primaryActor = actors[0]
       if (!primaryActor) return
 
-      const rings = game.l5r5e?.HelpersL5r5e?.getRingsList(primaryActor) ?? []
-      if (rings.length === 0) return
+      const ringEntries = Object.values(game.l5r5e?.HelpersL5r5e?.getRingsList?.(primaryActor) ?? {})
+      if (ringEntries.length === 0) return
 
       const stanceSet = new Set(actors
         .map((actor) => actor?.system?.stance)
         .filter((stance) => typeof stance === 'string'))
 
-      const ringActions = rings
+      const ringActions = ringEntries
         .map((ring) => {
           try {
             const id = ring.id
+            if (!id) return null
+
             const encodedValue = ['ring', id].join(this.delimiter)
-            const ringLabel = api.Utils.i18n(`l5r5e.rings.${id}`) ?? ring.label ?? id
+            const ringLabel = api.Utils.i18n?.(`l5r5e.rings.${id}`) ?? ring.label ?? id
 
             const actorValues = actors
               .map((actor) => actor?.system?.rings?.[id]?.value)
@@ -122,11 +126,9 @@ export function createActionHandlerClass(api) {
             let name = ringLabel
             if (actorValues.length === actors.length && actorValues.length > 0) {
               const uniqueValues = [...new Set(actorValues)]
-              if (uniqueValues.length === 1) {
-                name = `${ringLabel}: ${uniqueValues[0]}`
-              } else {
-                name = `${ringLabel}: ${uniqueValues.join('/')}`
-              }
+              name = uniqueValues.length === 1
+                ? `${ringLabel}: ${uniqueValues[0]}`
+                : `${ringLabel}: ${uniqueValues.join('/')}`
             } else if (ring?.value !== undefined) {
               name = `${ringLabel}: ${ring.value}`
             }
@@ -136,9 +138,8 @@ export function createActionHandlerClass(api) {
               cssClass = 'toggle active'
             }
 
-            const tooltip = api.Utils.i18n(`l5r5e.conflict.stances.${id}tip`) ?? ''
-
-            const img = api.Utils.getImage(`systems/l5r5e/assets/icons/rings/${id}.svg`)
+            const tooltip = api.Utils.i18n?.(`l5r5e.conflict.stances.${id}tip`) ?? ''
+            const img = api.Utils.getImage?.(`systems/l5r5e/assets/icons/rings/${id}.svg`)
 
             const valuesLabel = actorValues.length ? actorValues.join('/') : ''
             const listName = valuesLabel ? `${ringLabel}: ${valuesLabel}` : ringLabel
@@ -163,7 +164,7 @@ export function createActionHandlerClass(api) {
 
       const ringGroupData = {
         id: 'rings',
-        name: `${api.Utils.i18n('l5r5e.rings.title')}` ?? 'rings',
+        name: api.Utils.i18n?.('l5r5e.rings.title') ?? 'rings',
         type: 'system'
       }
 
