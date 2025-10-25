@@ -20,14 +20,25 @@ export function getCoreApiIfAvailable() {
   return game.modules.get(CORE_MODULE.ID)?.api ?? null
 }
 
+function hasRegistrationMethods(api) {
+  return typeof api?.registerSystem === 'function' || typeof api?.registerApi === 'function'
+}
+
 export function resolveCoreApi(payload = null) {
-  if (payload?.registerSystem || payload?.registerApi) {
-    return payload
+  const coreApi = getCoreApiIfAvailable()
+
+  const candidates = [
+    payload,
+    payload?.api,
+    coreApi,
+    coreApi?.api
+  ]
+
+  for (const api of candidates) {
+    if (hasRegistrationMethods(api)) {
+      return api
+    }
   }
 
-  if (payload?.api?.registerSystem || payload?.api?.registerApi) {
-    return payload.api
-  }
-
-  return getCoreApiIfAvailable()
+  return null
 }
