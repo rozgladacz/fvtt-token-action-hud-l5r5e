@@ -21,7 +21,7 @@ export function getCoreApiIfAvailable() {
 }
 
 export function resolveCoreApi(payload = null) {
-  if (payload?.registerSystem || payload?.registerApi || payload?.SystemManager) {
+  if (payload?.registerSystem || payload?.registerApi) {
     return payload
   }
 
