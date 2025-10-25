@@ -1,6 +1,6 @@
 
 import { ACTION_TYPE, GROUP, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
-import { getAttributeEntries, getInventoryGroupEntries, getTechniqueTypeEntries, sanitizeId } from './system-data.js'
+import { getAttributeEntries, getInventoryGroupEntries, getRingEntries, getTechniqueTypeEntries, sanitizeId, unsanitizeId } from './system-data.js'
 
 export function createActionHandlerClass(api) {
   return class ActionHandler extends api.ActionHandler {
@@ -103,7 +103,7 @@ export function createActionHandlerClass(api) {
       const primaryActor = actors[0]
       if (!primaryActor) return
 
-      const ringEntries = Object.values(game.l5r5e?.HelpersL5r5e?.getRingsList?.(primaryActor) ?? {})
+      const ringEntries = getRingEntries(primaryActor)
       if (ringEntries.length === 0) return
 
       const stanceSet = new Set(actors
@@ -117,11 +117,15 @@ export function createActionHandlerClass(api) {
             if (!id) return null
 
             const encodedValue = ['ring', id].join(this.delimiter)
-            const ringLabel = api.Utils.i18n?.(`l5r5e.rings.${id}`) ?? ring.label ?? id
+            const translationKey = ring.translationKey ?? `l5r5e.rings.${id}`
+            const localizedTranslation = translationKey ? api.Utils.i18n?.(translationKey) : null
+            const ringLabel = localizedTranslation && localizedTranslation !== translationKey
+              ? localizedTranslation
+              : api.Utils.i18n?.(`l5r5e.rings.${id}`) ?? ring.label ?? id
 
             const actorValues = actors
-              .map((actor) => actor?.system?.rings?.[id]?.value)
-              .filter((value) => value !== undefined && value !== null)
+              .map((actor) => this.#getActorRingValue(actor, id))
+              .filter((value) => value !== undefined && value !== null && value !== '')
 
             let name = ringLabel
             if (actorValues.length === actors.length && actorValues.length > 0) {
@@ -129,7 +133,7 @@ export function createActionHandlerClass(api) {
               name = uniqueValues.length === 1
                 ? `${ringLabel}: ${uniqueValues[0]}`
                 : `${ringLabel}: ${uniqueValues.join('/')}`
-            } else if (ring?.value !== undefined) {
+            } else if (ring?.value !== undefined && ring?.value !== null && ring?.value !== '') {
               name = `${ringLabel}: ${ring.value}`
             }
 
@@ -138,7 +142,9 @@ export function createActionHandlerClass(api) {
               cssClass = 'toggle active'
             }
 
-            const tooltip = api.Utils.i18n?.(`l5r5e.conflict.stances.${id}tip`) ?? ''
+            const tooltipKey = `l5r5e.conflict.stances.${id}tip`
+            const tooltipTranslation = api.Utils.i18n?.(tooltipKey)
+            const tooltip = tooltipTranslation && tooltipTranslation !== tooltipKey ? tooltipTranslation : ''
             const img = api.Utils.getImage?.(`systems/l5r5e/assets/icons/rings/${id}.svg`)
 
             const valuesLabel = actorValues.length ? actorValues.join('/') : ''
@@ -238,40 +244,54 @@ export function createActionHandlerClass(api) {
       const actionType = 'ring'
 
       // Get rings
-      const rings = game.l5r5e.HelpersL5r5e.getRingsList(this.actor)
+      const rings = getRingEntries(this.actor)
 
       // Exit if there are no rings
-      if (rings.length === 0) return
+      if (!rings || rings.length === 0) return
 
       // Get Stance
-      const stance = this.actor.system.stance
+      const stance = this.actor?.system?.stance
 
       // Create group data
       const groupData = {
         id: 'rings',
-        name: `${api.Utils.i18n(`l5r5e.rings.title`)}` ?? 'rings',
+        name: `${api.Utils.i18n('l5r5e.rings.title')}` ?? 'rings',
         type: 'system'
       }
 
       // Get actions
-      const actions = Object.values(rings)
+      const actions = rings
         .map((ring) => {
           try {
             const id = ring.id
+            if (!id) return null
+
             const encodedValue = [actionType, id].join(this.delimiter)
-            const name = `${api.Utils.i18n(`l5r5e.rings.${id}`)}: ${ring.value}` ?? ''
-            const actionTypeName = `${ring.label}:` ?? ''
-            const listName = `${actionTypeName}${name}`
+            const translationKey = ring.translationKey ?? `l5r5e.rings.${id}`
+            const localizedTranslation = translationKey ? api.Utils.i18n?.(translationKey) : null
+            const ringLabel = localizedTranslation && localizedTranslation !== translationKey
+              ? localizedTranslation
+              : api.Utils.i18n?.(`l5r5e.rings.${id}`) ?? ring.label ?? id
+
+            const value = ring?.value ?? this.#getActorRingValue(this.actor, id)
+            const hasValue = value !== undefined && value !== null && value !== ''
+            const name = hasValue ? `${ringLabel}: ${value}` : ringLabel
+            const actionTypeName = api.Utils.i18n?.('l5r5e.rings.title')
+            const listName = actionTypeName && actionTypeName !== 'l5r5e.rings.title'
+              ? `${actionTypeName}: ${name}`
+              : name
             const img = api.Utils.getImage(`systems/l5r5e/assets/icons/rings/${id}.svg`)
 
-            const tooltip = `${api.Utils.i18n(`l5r5e.conflict.stances.${id}tip`)}`
+            const tooltipKey = `l5r5e.conflict.stances.${id}tip`
+            const tooltipTranslation = api.Utils.i18n?.(tooltipKey)
+            const tooltip = tooltipTranslation && tooltipTranslation !== tooltipKey ? tooltipTranslation : ''
 
             let cssClass = ''
             if (id === stance) {
-              cssClass = `toggle active`
+              cssClass = 'toggle active'
             }
 
-            return {
+            const action = {
               id,
               name,
               img,
@@ -280,6 +300,12 @@ export function createActionHandlerClass(api) {
               tooltip,
               listName
             }
+
+            if (hasValue) {
+              action.info1 = { text: value }
+            }
+
+            return action
           } catch (error) {
             api.Logger.error(ring)
             return null
@@ -1031,6 +1057,50 @@ export function createActionHandlerClass(api) {
       }
 
       return entry.id
+    }
+
+    #getActorRingValue(actor, ringId) {
+      if (!actor || !ringId) return ''
+      const rings = actor?.system?.rings ?? {}
+      const sanitizedId = sanitizeId(ringId)
+      const unsanitizedId = unsanitizeId(ringId)
+
+      const candidates = [
+        rings?.[ringId],
+        rings?.[sanitizedId],
+        rings?.[unsanitizedId]
+      ]
+
+      for (const candidate of candidates) {
+        const value = this.#extractRingValue(candidate)
+        if (value !== '' && value !== undefined && value !== null) return value
+      }
+
+      if (rings && typeof rings === 'object') {
+        for (const [key, value] of Object.entries(rings)) {
+          if (sanitizeId(key) !== sanitizedId) continue
+          const resolved = this.#extractRingValue(value)
+          if (resolved !== '' && resolved !== undefined && resolved !== null) return resolved
+        }
+      }
+
+      return ''
+    }
+
+    #extractRingValue(data) {
+      if (data === null || data === undefined) return ''
+      if (typeof data === 'number' || typeof data === 'string') return data
+      if (typeof data !== 'object') return ''
+
+      for (const key of ['value', 'rank', 'rating', 'level', 'dice', 'current', 'score']) {
+        if (data[key] !== undefined) return data[key]
+      }
+
+      const numericValues = Object.values(data).filter((value) => typeof value === 'number')
+      if (numericValues.length === 1) return numericValues[0]
+      if (numericValues.length > 1) return numericValues.join('/')
+
+      return ''
     }
 
     #getGroupData(groupId, groupMap, { fallbackPrefix } = {}) {

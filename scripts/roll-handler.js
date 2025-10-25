@@ -83,16 +83,16 @@ export function createRollHandlerClass(api) {
     async #handleAction(event, actor, token, actionTypeId, actionId) {
       switch (actionTypeId) {
         case 'weapons':
-          this.#handleWeaponAction(event, actor, token, actionId)
+          await this.#handleWeaponAction(event, actor, token, actionId)
           break
         case 'ring':
-          this.#handleRingAction(event, actor, token, actionId)
+          await this.#handleRingAction(event, actor, token, actionId)
           break
         case 'skill':
-          this.#handleSkillAction(event, actor, token, actionId)
+          await this.#handleSkillAction(event, actor, token, actionId)
           break
         case 'technique':
-          this.#handleTechniqueAction(event, actor, token, actionId)
+          await this.#handleTechniqueAction(event, actor, token, actionId)
           break
         case 'armor':
           await this.#handleItemAction(event, actor, actionId, token)
@@ -244,7 +244,7 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleWeaponAction(_event, actor, token, actionId) {
+    async #handleWeaponAction(_event, actor, token, actionId) {
       const weapon = actor.items.get(actionId)
       if (!weapon) return
 
@@ -279,7 +279,7 @@ export function createRollHandlerClass(api) {
         options.ringId = ringId
       }
 
-      this.#openDicePicker(actor, options, token)
+      await this.#openDicePicker(actor, options, token)
     }
 
     /**
@@ -289,14 +289,14 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleRingAction(_event, actor, token, actionId) {
+    async #handleRingAction(_event, actor, token, actionId) {
       const options = {
         ring: actionId,
         ringId: actionId,
         context: 'token-action-hud'
       }
 
-      this.#openDicePicker(actor, options, token)
+      await this.#openDicePicker(actor, options, token)
     }
 
     /**
@@ -306,14 +306,14 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleSkillAction(_event, actor, token, actionId) {
+    async #handleSkillAction(_event, actor, token, actionId) {
       const options = {
         skill: actionId,
         skillId: actionId,
         context: 'token-action-hud'
       }
 
-      this.#openDicePicker(actor, options, token)
+      await this.#openDicePicker(actor, options, token)
     }
 
     /**
@@ -323,11 +323,11 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleTechniqueAction(_event, actor, token, actionId) {
+    async #handleTechniqueAction(_event, actor, token, actionId) {
       const technique = actor.items.get(actionId)
 
-      if (!technique || technique.type !== "technique" || !technique.system.skill) {
-        return;
+      if (!technique || technique.type !== 'technique') {
+        return
       }
 
       const skillIds = this.#extractSkillIds(technique?.system?.skill)
@@ -362,13 +362,37 @@ export function createRollHandlerClass(api) {
         options.ringId = ringId
       }
 
-      this.#openDicePicker(actor, options, token)
+      await this.#openDicePicker(actor, options, token)
     }
 
-    #openDicePicker(actor, payload = {}, token) {
-      const Dialog = game?.l5r5e?.DicePickerDialog
-      if (!Dialog) return
+    async #openDicePicker(actor, payload = {}, token) {
+      const options = this.#prepareDiceOptions(actor, payload, token)
+      const Dialog = this.#resolveDiceDialog()
 
+      if (Dialog) {
+        const dialogResult = await this.#invokeDiceDialog(Dialog, actor, options)
+        if (dialogResult !== undefined && dialogResult !== null && dialogResult !== false) {
+          return dialogResult
+        }
+      }
+
+      const fallbackResult = await this.#fallbackSystemRoll(actor, options)
+      if (fallbackResult !== null && fallbackResult !== undefined && fallbackResult !== false) {
+        return fallbackResult
+      }
+
+      const localizedPrimary = game.i18n?.localize?.('tokenActionHud.l5r5e.dicePickerError')
+      const localizedSecondary = game.i18n?.localize?.('tokenActionHud.notifications.dicePickerError')
+      const errorMessage = (localizedPrimary && localizedPrimary !== 'tokenActionHud.l5r5e.dicePickerError')
+        ? localizedPrimary
+        : (localizedSecondary && localizedSecondary !== 'tokenActionHud.notifications.dicePickerError')
+          ? localizedSecondary
+          : 'Token Action HUD L5R5e: Unable to open Dice Picker Dialog'
+      ui.notifications?.warn?.(errorMessage)
+      return null
+    }
+
+    #prepareDiceOptions(actor, payload = {}, token) {
       const options = { ...payload }
 
       if (actor && !options.actor) options.actor = actor
@@ -449,6 +473,80 @@ export function createRollHandlerClass(api) {
       options.dicePool = options.dicePool ? { ...diceContext, ...options.dicePool } : { ...diceContext }
       options.pool = options.pool ? { ...diceContext, ...options.pool } : { ...diceContext }
 
+      return options
+    }
+
+    #resolveDiceDialog() {
+      const system = game?.l5r5e ?? {}
+      const containers = [
+        system,
+        system?.Dice,
+        system?.dice,
+        system?.DiceRoller,
+        system?.apps,
+        system?.apps?.dice,
+        system?.apps?.Dice,
+        system?.apps?.dialogs,
+        system?.applications,
+        system?.applications?.dice,
+        system?.applications?.Dice,
+        system?.applications?.dialogs,
+        system?.ui,
+        system?.ui?.dice,
+        system?.modules,
+        CONFIG?.l5r5e,
+        CONFIG?.l5r5e?.apps,
+        CONFIG?.l5r5e?.dice
+      ]
+
+      const classNames = [
+        'DicePickerDialog',
+        'DicePoolDialog',
+        'DiceDialog',
+        'DiceRollDialog',
+        'DiceCheckDialog',
+        'CheckDialog',
+        'RollDialog',
+        'SkillCheckDialog',
+        'SkillRollDialog'
+      ]
+
+      for (const container of containers) {
+        if (!container) continue
+        for (const name of classNames) {
+          const candidate = container?.[name]
+          const resolved = this.#resolveDialogCandidate(candidate)
+          if (resolved) return resolved
+        }
+      }
+
+      return null
+    }
+
+    #resolveDialogCandidate(candidate, depth = 0) {
+      if (!candidate || depth > 3) return null
+
+      if (typeof candidate === 'function') return candidate
+
+      if (typeof candidate === 'object') {
+        const methodCandidates = ['show', 'open', 'create', 'launch', 'render']
+        const hasDirectMethod = methodCandidates.some((method) => typeof candidate?.[method] === 'function')
+        if (hasDirectMethod) return candidate
+
+        const nestedKeys = ['Dialog', 'dialog', 'default', 'DicePickerDialog', 'DicePoolDialog', 'DiceDialog']
+        for (const key of nestedKeys) {
+          const nested = candidate?.[key]
+          const resolved = this.#resolveDialogCandidate(nested, depth + 1)
+          if (resolved) return resolved
+        }
+      }
+
+      return null
+    }
+
+    async #invokeDiceDialog(Dialog, actor, options) {
+      if (!Dialog) return null
+
       const staticMethods = [
         ['show', [[options], [actor, options], [options, actor]]],
         ['open', [[options], [actor, options], [options, actor]]],
@@ -462,7 +560,7 @@ export function createRollHandlerClass(api) {
         if (typeof method !== 'function') continue
         for (const args of argSets) {
           try {
-            const result = method.apply(Dialog, args)
+            const result = await method.apply(Dialog, args)
             if (result !== undefined) return result
           } catch (error) {
             continue
@@ -470,44 +568,160 @@ export function createRollHandlerClass(api) {
         }
       }
 
-      const argumentCandidates = []
-      argumentCandidates.push([options])
-      argumentCandidates.push([actor, options])
-      argumentCandidates.push([options, actor])
-      argumentCandidates.push([options, { actor }])
-      argumentCandidates.push([{ actor, options }])
-      if (options.context) {
-        argumentCandidates.push([actor, options, options.context])
-        argumentCandidates.push([options, actor, options.context])
-      }
-
-      const expectedArgs = typeof Dialog.length === 'number' ? Dialog.length : null
-      const filteredCandidates = expectedArgs && expectedArgs > 0
+      const argumentCandidates = this.#createDiceArgSets(actor, options)
+      const expectedArgs = typeof Dialog === 'function' && typeof Dialog.length === 'number'
+        ? Dialog.length
+        : null
+      const filteredCandidates = expectedArgs !== null && expectedArgs >= 0
         ? argumentCandidates.filter((args) => args.length === expectedArgs)
         : argumentCandidates
 
-      for (const args of filteredCandidates) {
-        try {
-          const dialog = new Dialog(...args)
-          if (typeof dialog?.render === 'function') {
-            dialog.render(true)
-          } else if (typeof dialog?.open === 'function') {
-            dialog.open(options)
+      if (typeof Dialog === 'function') {
+        for (const args of filteredCandidates) {
+          try {
+            const result = await Dialog(...args)
+            if (result !== undefined) return result
+          } catch (error) {
+            continue
           }
-          return dialog
-        } catch (error) {
-          continue
+        }
+
+        for (const args of filteredCandidates) {
+          try {
+            const dialog = new Dialog(...args)
+            if (typeof dialog?.render === 'function') {
+              dialog.render(true)
+            } else if (typeof dialog?.open === 'function') {
+              await dialog.open(options)
+            }
+            return dialog
+          } catch (error) {
+            continue
+          }
         }
       }
 
-      const localizedPrimary = game.i18n?.localize?.('tokenActionHud.l5r5e.dicePickerError')
-      const localizedSecondary = game.i18n?.localize?.('tokenActionHud.notifications.dicePickerError')
-      const errorMessage = (localizedPrimary && localizedPrimary !== 'tokenActionHud.l5r5e.dicePickerError')
-        ? localizedPrimary
-        : (localizedSecondary && localizedSecondary !== 'tokenActionHud.notifications.dicePickerError')
-          ? localizedSecondary
-          : 'Token Action HUD L5R5e: Unable to open Dice Picker Dialog'
-      ui.notifications?.warn?.(errorMessage)
+      if (typeof Dialog === 'object') {
+        for (const methodName of ['show', 'open', 'create', 'launch']) {
+          const method = Dialog?.[methodName]
+          if (typeof method !== 'function') continue
+          for (const args of argumentCandidates) {
+            try {
+              const result = await method.apply(Dialog, args)
+              if (result !== undefined) return result
+            } catch (error) {
+              continue
+            }
+          }
+        }
+
+        if (typeof Dialog?.render === 'function') {
+          try {
+            const result = await Dialog.render(options)
+            if (result !== undefined) return result
+          } catch (error) {
+            // ignore
+          }
+        }
+      }
+
+      return null
+    }
+
+    async #fallbackSystemRoll(actor, options) {
+      const l5r5e = game?.l5r5e ?? {}
+      const diceApis = [
+        { fn: actor?.rollSkill, context: actor },
+        { fn: actor?.rollCheck, context: actor },
+        { fn: actor?.rollDicePool, context: actor },
+        { fn: actor?.rollAction, context: actor },
+        { fn: actor?.roll, context: actor },
+        { fn: l5r5e?.dice?.rollSkill, context: l5r5e?.dice },
+        { fn: l5r5e?.dice?.rollCheck, context: l5r5e?.dice },
+        { fn: l5r5e?.dice?.rollDicePool, context: l5r5e?.dice },
+        { fn: l5r5e?.Dice?.roll, context: l5r5e?.Dice },
+        { fn: l5r5e?.Roller?.roll, context: l5r5e?.Roller },
+        { fn: l5r5e?.DiceRoller?.roll, context: l5r5e?.DiceRoller },
+        { fn: l5r5e?.rollSkill, context: l5r5e },
+        { fn: l5r5e?.rollCheck, context: l5r5e },
+        { fn: l5r5e?.rollDicePool, context: l5r5e }
+      ].filter((entry) => typeof entry.fn === 'function')
+
+      const argSets = this.#createDiceArgSets(actor, options)
+
+      for (const { fn, context } of diceApis) {
+        for (const args of argSets) {
+          try {
+            const result = await fn.apply(context, args)
+            if (result !== false) return result ?? true
+          } catch (error) {
+            continue
+          }
+        }
+      }
+
+      return null
+    }
+
+    #createDiceArgSets(actor, options) {
+      const args = []
+      args.push([])
+      args.push([options])
+      args.push([actor, options])
+      args.push([options, actor])
+      args.push([options, { actor }])
+      args.push([{ actor, options }])
+
+      if (options?.context) {
+        args.push([actor, options, options.context])
+        args.push([options, actor, options.context])
+        args.push([{ actor, context: options.context, options }])
+      }
+
+      const token = options?.token
+      if (token) {
+        args.push([actor, options, token])
+        args.push([options, token, actor])
+        args.push([{ actor, token, options }])
+      }
+
+      const skill = options?.skill ?? options?.skillId
+      const ring = options?.ring ?? options?.ringId
+
+      if (skill) {
+        args.push([skill])
+        args.push([skill, options])
+        args.push([skill, options, actor])
+        args.push([{ skill, options }])
+        if (ring) {
+          args.push([skill, ring])
+          args.push([skill, ring, options])
+          args.push([{ skill, ring, actor, options }])
+        }
+      }
+
+      if (ring && !skill) {
+        args.push([ring])
+        args.push([ring, options])
+      }
+
+      const seen = new Set()
+      const uniqueArgs = []
+      for (const candidate of args) {
+        const filtered = candidate.filter((value) => value !== undefined)
+        const key = JSON.stringify(filtered, (_key, value) => {
+          if (value === actor) return '__ACTOR__'
+          if (value === options) return '__OPTIONS__'
+          if (value === token) return '__TOKEN__'
+          if (typeof value === 'object' && value !== null) return '__OBJECT__'
+          return value
+        })
+        if (seen.has(key)) continue
+        seen.add(key)
+        uniqueArgs.push(filtered)
+      }
+
+      return uniqueArgs
     }
 
     #extractRingId(data) {

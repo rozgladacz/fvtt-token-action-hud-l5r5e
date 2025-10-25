@@ -19,6 +19,14 @@ const FALLBACK_INVENTORY_GROUPS = [
   { id: 'weapons', actorKey: 'weapons', translationKey: 'l5r5e.weapons.title' }
 ]
 
+const FALLBACK_RINGS = [
+  { id: 'air', translationKey: 'l5r5e.rings.air' },
+  { id: 'earth', translationKey: 'l5r5e.rings.earth' },
+  { id: 'fire', translationKey: 'l5r5e.rings.fire' },
+  { id: 'water', translationKey: 'l5r5e.rings.water' },
+  { id: 'void', translationKey: 'l5r5e.rings.void' }
+]
+
 const ATTRIBUTE_CONFIG = {
   derived: {
     helperMethods: ['getDerivedAttributesList', 'getDerivedList', 'getDerivedAttributes'],
@@ -70,6 +78,48 @@ export function getInventoryGroupEntries() {
   })
 
   return dedupeEntries(entries)
+}
+
+export function getRingEntries(actor) {
+  const helper = getHelpers()
+
+  const helperMethods = [
+    'getRingsList',
+    'getRings',
+    'getRingList',
+    'getRingEntries',
+    'ringsList',
+    'rings'
+  ]
+
+  const helperArgSets = actor
+    ? [[actor], [actor, { actor }], [{ actor }], []]
+    : [[{ actor }], []]
+
+  for (const methodName of helperMethods) {
+    const method = helper?.[methodName]
+    const entries = invokeAndNormalizeRingEntries(method, helper, helperArgSets, actor)
+    if (entries.length > 0) return entries
+  }
+
+  const configPaths = [
+    'rings.list',
+    'rings.entries',
+    'rings',
+    'attributes.rings',
+    'characteristics.rings'
+  ]
+
+  for (const path of configPaths) {
+    const value = foundry.utils.getProperty(CONFIG?.l5r5e ?? {}, path)
+    const entries = normalizeRingEntries(value, actor)
+    if (entries.length > 0) return entries
+  }
+
+  const actorEntries = normalizeRingEntries(actor?.system?.rings, actor)
+  if (actorEntries.length > 0) return actorEntries
+
+  return normalizeRingEntries(FALLBACK_RINGS, actor)
 }
 
 export function getAttributeEntries(type, actor) {
@@ -134,7 +184,7 @@ function collectEntries({ helperMethods = [], helperArgsSets = [[]], configPaths
 }
 
 function getEntriesFromHelpers(methodNames, helperArgsSets, translationPrefix, stringIsTranslation) {
-  const helper = game?.l5r5e?.HelpersL5r5e
+  const helper = getHelpers()
   if (!helper) return []
 
   for (const methodName of methodNames) {
@@ -252,5 +302,117 @@ function dedupeEntries(entries) {
     }
   }
   return [...map.values()]
+}
+
+function invokeAndNormalizeRingEntries(method, context, argSets, actor) {
+  if (typeof method !== 'function') return []
+
+  for (const args of argSets) {
+    try {
+      const result = Array.isArray(args) ? method.apply(context, args) : method.call(context, args)
+      const entries = normalizeRingEntries(result, actor)
+      if (entries.length > 0) return entries
+    } catch (error) {
+      console.debug(`Token Action HUD L5R5e | Ring helper failed`, error)
+    }
+  }
+
+  return []
+}
+
+function normalizeRingEntries(value, actor) {
+  const entries = []
+
+  const pushEntry = (entry, fallbackId) => {
+    if (!entry && fallbackId === undefined) return
+    const idSource = entry?.id ?? entry?.key ?? entry?.slug ?? entry?.value ?? entry?.name ?? fallbackId
+    const id = sanitizeId(idSource)
+    if (!id) return
+
+    const label = entry?.label ?? entry?.name ?? entry?.title ?? entry?.translationKey ?? null
+    const translationKey = entry?.translationKey ?? buildTranslationKey('l5r5e.rings', id)
+    const ringValue = resolveRingValue(entry, id, actor)
+
+    entries.push({ id, label, translationKey, value: ringValue })
+  }
+
+  if (!value) return entries
+
+  if (value instanceof Map) {
+    value.forEach((entry, key) => {
+      if (typeof entry === 'object') {
+        pushEntry(entry, key)
+      } else {
+        pushEntry({ value: entry }, key)
+      }
+    })
+    return entries
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => {
+      if (typeof entry === 'object') {
+        pushEntry(entry, entry?.id ?? entry?.key ?? entry?.slug ?? index)
+      } else {
+        pushEntry({ id: entry }, entry)
+      }
+    })
+    return entries
+  }
+
+  if (typeof value === 'object') {
+    Object.entries(value).forEach(([key, entry]) => {
+      if (typeof entry === 'object') {
+        pushEntry({ id: entry.id ?? key, ...entry }, key)
+      } else {
+        pushEntry({ id: key, value: entry }, key)
+      }
+    })
+    return entries
+  }
+
+  if (typeof value === 'string') {
+    pushEntry({ id: value }, value)
+  }
+
+  return entries
+}
+
+function resolveRingValue(entry, id, actor) {
+  const ringValue = extractRingValue(entry)
+  if (ringValue !== '' && ringValue !== undefined && ringValue !== null) return ringValue
+
+  const actorRing = actor?.system?.rings?.[id] ?? actor?.system?.rings?.[unsanitizeId(id)]
+  const actorValue = extractRingValue(actorRing)
+  if (actorValue !== '' && actorValue !== undefined && actorValue !== null) return actorValue
+
+  return ''
+}
+
+function extractRingValue(data) {
+  if (data === null || data === undefined) return ''
+  if (typeof data === 'number' || typeof data === 'string') return data
+  if (typeof data !== 'object') return ''
+
+  for (const key of ['value', 'rank', 'rating', 'level', 'dice', 'current', 'score']) {
+    if (data[key] !== undefined) return data[key]
+  }
+
+  const numericValues = Object.values(data).filter((value) => typeof value === 'number')
+  if (numericValues.length === 1) return numericValues[0]
+  if (numericValues.length > 1) return numericValues.join('/')
+
+  return ''
+}
+
+function getHelpers() {
+  const system = game?.l5r5e ?? {}
+  return system.HelpersL5r5e
+    ?? system.helpers
+    ?? system?.apps?.helpers
+    ?? system?.applications?.helpers
+    ?? system?.api?.helpers
+    ?? system?.Helpers
+    ?? null
 }
 
