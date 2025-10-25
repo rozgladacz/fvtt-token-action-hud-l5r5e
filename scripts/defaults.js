@@ -52,7 +52,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         name: coreModule.api.Utils.i18n('l5r5e.techniques.title'),
         groups: [
           { ...groups.school_ability, nestId: 'techniques_school' },
-          { ...groups.mastery, nestId: 'techniques_mastery' },
+          { ...groups.mastery_ability, nestId: 'techniques_mastery' },
           { ...groups.kata, nestId: 'techniques_kata' },
           { ...groups.kiho, nestId: 'techniques_kiho' },
           { ...groups.inversion, nestId: 'techniques_inversion' },
@@ -62,7 +62,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
           { ...groups.maho, nestId: 'techniques_maho' },
           { ...groups.ninjutsu, nestId: 'techniques_ninjutsu' },
           { ...groups.mantra, nestId: 'techniques_mantra' },
-          { ...groups.titleAbility, nestId: 'techniques_title' }
+          { ...groups.title_ability, nestId: 'techniques_title' }
         ]
       },
       {

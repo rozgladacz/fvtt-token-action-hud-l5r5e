@@ -36,6 +36,7 @@ export const GROUP = {
   weapons: { id: 'weapons', name: 'l5r5e.weapons.title', type: 'system' },
   combat: { id: 'combat', name: 'tokenActionHud.combat', type: 'system' },
   token: { id: 'token', name: 'tokenActionHud.token', type: 'system' },
+  rests: { id: 'rests', name: 'tokenActionHud.rests', type: 'system' },
   utility: { id: 'utility', name: 'tokenActionHud.utility', type: 'system' },
   rings: { id: 'rings', name: 'l5r5e.rings.title', type: 'system' },
   derived: { id: 'derived', name: 'l5r5e.attributes.title', type: 'system' },
