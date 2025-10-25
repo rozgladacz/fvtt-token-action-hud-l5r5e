@@ -1,5 +1,5 @@
 
-import { ACTION_TYPE, GROUP,ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
+import { ACTION_TYPE, GROUP, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
 import { getAttributeEntries, getInventoryGroupEntries, getTechniqueTypeEntries, sanitizeId } from './system-data.js'
 
 export function createActionHandlerClass(api) {
@@ -1264,59 +1264,82 @@ export function createActionHandlerClass(api) {
 
       if (this.tooltipsSetting === 'nameOnly') return name
 
-      const description = (typeof entity?.system?.description === 'string') ? entity?.system?.description : entity?.system?.description?.value ?? ''
+      const description = typeof entity?.system?.description === 'string'
+        ? entity?.system?.description
+        : entity?.system?.description?.value ?? ''
+
       const modifiers = entity?.modifiers ?? null
       const properties = [
-        ...entity.system?.chatProperties ?? [],
-        ...entity.system?.equippableItemCardProperties ?? [],
-        ...entity.system?.activatedEffectCardProperties ?? []
-      ].filter(p => p)
+        ...(entity?.system?.chatProperties ?? []),
+        ...(entity?.system?.equippableItemCardProperties ?? []),
+        ...(entity?.system?.activatedEffectCardProperties ?? [])
+      ].filter(Boolean)
+
       const type = entity?.type
-      const rarity = entity?.system?.rarity ?? null
+      const rarity = entity?.system?.rarity?.value ?? entity?.system?.rarity ?? null
       const traits = this.#getItemQualities(entity?.system?.properties)
       const patterns = this.#getItemPatterns(entity?.system?.patterns)
       const tags = this.#getItemTags(entity?.system?.tags)
       const bonuses = this.#getItemBonuses(entity?.system?.bonuses)
-      const range = (entity?.type === 'weapon') ? entity?.system?.range : null
-      const damage = (entity?.type === 'weapon') ? entity?.system?.damage : null
-      const deadliness = (entity?.type === 'weapon') ? entity?.system?.deadliness : null
-      const grip1 = (entity?.type === 'weapon') ? entity?.system?.grip_1 : null
-      const grip2 = (entity?.type === 'weapon') ? entity?.system?.grip_2 : null
-      const physical = (entity?.type === 'armor') ? entity?.system?.armor?.physical : null
-      const supernatural = (entity?.type === 'armor') ? entity?.system?.armor?.supernatural : null
-      return { name, type, description, modifiers, properties, rarity, traits, patterns, tags, bonuses, range, damage, deadliness, grip1, grip2, physical, supernatural }
+      const range = type === 'weapon' ? (entity?.system?.range?.value ?? entity?.system?.range) : null
+      const damage = type === 'weapon' ? (entity?.system?.damage?.value ?? entity?.system?.damage) : null
+      const deadliness = type === 'weapon' ? (entity?.system?.deadliness?.value ?? entity?.system?.deadliness) : null
+      const grip1 = type === 'weapon' ? (entity?.system?.grip_1?.value ?? entity?.system?.grip_1) : null
+      const grip2 = type === 'weapon' ? (entity?.system?.grip_2?.value ?? entity?.system?.grip_2) : null
+      const physical = type === 'armor' ? (entity?.system?.armor?.physical?.value ?? entity?.system?.armor?.physical) : null
+      const supernatural = type === 'armor' ? (entity?.system?.armor?.supernatural?.value ?? entity?.system?.armor?.supernatural) : null
+
+      return {
+        name,
+        type,
+        description,
+        modifiers,
+        properties,
+        rarity,
+        traits,
+        patterns,
+        tags,
+        bonuses,
+        range,
+        damage,
+        deadliness,
+        grip1,
+        grip2,
+        physical,
+        supernatural
+      }
     }
 
     #getItemQualities(itemProperties) {
-      if (!itemProperties) return null
-      const qualities = Object.entries(itemProperties)
-        .filter(([_, quality]) => {
-          if (typeof quality === 'boolean') return quality
-          if (typeof quality === 'object') {
-            if (quality?.value === false) return false
-            if (quality?.active === false) return false
-          }
-          return true
-        })
-        .map(([id, quality]) => {
+      const entries = this.#normalisePropertyEntries(itemProperties)
+      if (!entries.length) return null
+
+      const qualities = entries
+        .map(entry => {
+          if (!entry) return null
+
+          const data = (typeof entry === 'object') ? entry : { id: entry }
+          const id = this.#normaliseId(data?.id ?? data?.key ?? data?.slug ?? data?.name)
+          if (!id) return null
+
+          const isActive = (data?.active ?? data?.enabled ?? data?.value ?? true) !== false
+          if (!isActive) return null
+
           const labelKey = ITEM_QUALITIES[id]
-          const fallback = quality?.label ?? quality?.name ?? this.#formatLabel(id)
-          const label = labelKey ?? fallback
-          const localized = Boolean(!labelKey && fallback)
+          const fallback = data?.label ?? data?.name ?? this.#formatLabel(id)
 
-          const resolved = (!localized && label)
-            ? api.Utils.i18n(label)
-            : label
+          if (!labelKey && !fallback) return null
 
-          if (!resolved || resolved === label && labelKey && fallback) {
-            return fallback
-          }
+          if (!labelKey) return fallback
 
-          return resolved
+          const localized = api.Utils.i18n(labelKey)
+          if (localized && localized !== labelKey) return localized
+
+          return fallback ?? labelKey
         })
         .filter(Boolean)
 
-      return (qualities.length > 0) ? qualities : null
+      return qualities.length ? qualities : null
     }
 
     /**
@@ -1431,7 +1454,7 @@ export function createActionHandlerClass(api) {
         .map(entry => {
           if (!entry) return null
           const data = (typeof entry === 'object') ? entry : { id: entry }
-          const id = data?.id ?? data?.key ?? data?.slug ?? data?.name
+          const id = this.#normaliseId(data?.id ?? data?.key ?? data?.slug ?? data?.name)
           if (!id) return null
 
           const isActive = (data?.active ?? data?.enabled ?? data?.value ?? true) !== false
@@ -1459,11 +1482,11 @@ export function createActionHandlerClass(api) {
       const entries = this.#normalisePropertyEntries(tags)
       if (!entries.length) return null
 
-      return entries
+      const tagEntries = entries
         .map(entry => {
           if (!entry) return null
           const data = (typeof entry === 'object') ? entry : { id: entry }
-          const id = data?.id ?? data?.key ?? data?.slug ?? data?.type ?? data?.name
+          const id = this.#normaliseId(data?.id ?? data?.key ?? data?.slug ?? data?.type ?? data?.name)
           if (!id) return null
 
           const isActive = (data?.active ?? data?.enabled ?? data?.value ?? true) !== false
@@ -1487,6 +1510,8 @@ export function createActionHandlerClass(api) {
           }
         })
         .filter(Boolean)
+
+      return tagEntries.length ? tagEntries : null
     }
 
     #getItemBonuses(bonuses) {
@@ -1499,7 +1524,7 @@ export function createActionHandlerClass(api) {
         .map(entry => {
           if (!entry) return null
           const data = (typeof entry === 'object') ? entry : { id: entry }
-          const id = data?.id ?? data?.key ?? data?.slug ?? data?.type ?? data?.name
+          const id = this.#normaliseId(data?.id ?? data?.key ?? data?.slug ?? data?.type ?? data?.name)
           if (!id) return null
 
           const isActive = (data?.active ?? data?.enabled ?? true) !== false
@@ -1578,6 +1603,14 @@ export function createActionHandlerClass(api) {
     #normalisePropertyEntries(property) {
       if (!property) return []
       if (Array.isArray(property)) return property.filter(p => p !== null && p !== undefined)
+      if (property instanceof Map) {
+        return Array.from(property.entries()).map(([id, value]) => {
+          if (typeof value === 'object' && value !== null) {
+            return { id, ...value }
+          }
+          return { id, value }
+        })
+      }
       if (property instanceof Set) return [...property]
       if (typeof property === 'object') {
         return Object.entries(property).map(([id, value]) => {
@@ -1588,6 +1621,18 @@ export function createActionHandlerClass(api) {
         })
       }
       return [property]
+    }
+
+    #normaliseId(id) {
+      if (id === null || id === undefined) return ''
+      const value = (typeof id === 'string') ? id : String(id)
+      return value
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/[A-Z]/g, match => `_${match.toLowerCase()}`)
+        .replace(/[-]+/g, '_')
+        .replace(/__+/g, '_')
+        .replace(/^_+|_+$/g, '')
     }
 
     #formatLabel(label) {
