@@ -27,17 +27,20 @@ function hasRegistrationMethods(api) {
 export function resolveCoreApi(payload = null) {
   const coreApi = getCoreApiIfAvailable()
 
-  const candidates = [
-    payload,
-    payload?.api,
-    coreApi,
-    coreApi?.api
-  ]
+  if (hasRegistrationMethods(payload)) {
+    return payload
+  }
 
-  for (const api of candidates) {
-    if (hasRegistrationMethods(api)) {
-      return api
-    }
+  if (hasRegistrationMethods(payload?.api)) {
+    return payload.api
+  }
+
+  if (hasRegistrationMethods(coreApi)) {
+    return coreApi
+  }
+
+  if (hasRegistrationMethods(coreApi?.api)) {
+    return coreApi.api
   }
 
   return null
