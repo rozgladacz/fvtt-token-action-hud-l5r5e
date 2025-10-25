@@ -6,6 +6,61 @@
           "name": "Display Unequipped",
           "hint": "Choose whether to display unequipped items on the HUD"
         }
+      },
+      "tooltip": {
+        "rarity": "Rarity"
+      },
+      "qualities": {
+        "razorEdged": "Razor-Edged",
+        "ceremonial": "Ceremonial",
+        "damaged": "Damaged",
+        "destroyed": "Destroyed",
+        "concealable": "Concealable",
+        "cumbersome": "Cumbersome",
+        "snaring": "Snaring",
+        "unholy": "Unholy",
+        "forbidden": "Forbidden",
+        "resplendent": "Resplendent",
+        "wargear": "Wargear",
+        "mundane": "Mundane",
+        "prepare": "Prepare",
+        "sacred": "Sacred",
+        "durable": "Durable",
+        "subtle": "Subtle",
+        "kenzoBlade": "Kenzō Blade"
+      },
+      "patterns": {
+        "jadeInlay": "Shirogane Jade Inlay",
+        "uchema": "Uchema’s Technique",
+        "yasunori": "Yasunori Steel",
+        "akodo": "Akodo Pattern",
+        "burningWater": "Burning Water Pattern",
+        "concealment": "Concealment Pattern",
+        "deadlyFangs": "Deadly Fangs Pattern",
+        "fearsomeSnarl": "Fearsome Snarl Pattern",
+        "ichiro": "Ichirō Pattern",
+        "mountainSilk": "Mountain Silk Pattern",
+        "screamingFire": "Screaming Fire Pattern",
+        "toriyama": "Toriyama Endurance Pattern",
+        "qamarist": "Spirit of the Qamarist Pattern",
+        "yodhaniya": "Ghostlands Yodhaniya Pattern",
+        "kokejin": "Kökejin’s Heart of the Wind Pattern",
+        "agasha": "Agasha Pattern"
+      },
+      "tags": {
+        "clan": "Clan",
+        "culture": "Culture",
+        "material": "Material",
+        "tradition": "Tradition"
+      },
+      "bonuses": {
+        "armorTN": "Armor TN",
+        "resistance": "Resistance",
+        "fatigue": "Fatigue",
+        "strife": "Strife",
+        "deadliness": "Deadliness",
+        "damage": "Damage",
+        "opportunities": "Opportunities"
       }
     }
   }
