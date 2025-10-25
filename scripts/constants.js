@@ -6,6 +6,13 @@ export const MODULE = {
 }
 
 /**
+ * System constants
+ */
+export const SYSTEM = {
+  ID: 'l5r5e'
+}
+
+/**
  * Core module
  */
 export const CORE_MODULE = {

@@ -2,7 +2,11 @@ import { MODULE } from './constants.js'
 
 export let Utils = null
 
-Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
+export function initializeUtils(coreApi) {
+    if (!coreApi || Utils) {
+        return
+    }
+
     /**
      * Utility functions
      */
@@ -18,7 +22,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
             try {
                 value = game.settings.get(MODULE.ID, key)
             } catch {
-                coreModule.api.Logger.debug(`Setting '${key}' not found`)
+                coreApi.Logger.debug(`Setting '${key}' not found`)
             }
             return value
         }
@@ -31,10 +35,12 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         static async setSetting (key, value) {
             try {
                 value = await game.settings.set(MODULE.ID, key, value)
-                coreModule.api.Logger.debug(`Setting '${key}' set to '${value}'`)
+                coreApi.Logger.debug(`Setting '${key}' set to '${value}'`)
             } catch {
-                coreModule.api.Logger.debug(`Setting '${key}' not found`)
+                coreApi.Logger.debug(`Setting '${key}' not found`)
             }
         }
     }
-})
+}
+
+Hooks.once('tokenActionHudCoreApiReady', initializeUtils)
