@@ -47,9 +47,7 @@ const onCoreApiReady = (api) => {
   }
 }
 
-Hooks.once('init', () => {
-  Hooks.on('tokenActionHudCoreApiReady', onCoreApiReady)
-})
+Hooks.on('tokenActionHudCoreApiReady', onCoreApiReady)
 
 Hooks.once('ready', () => {
   const coreModule = game.modules.get(CORE_MODULE.ID)
