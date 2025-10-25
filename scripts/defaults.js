@@ -1,4 +1,5 @@
 import { GROUP } from './constants.js'
+import { getTechniqueTypeEntries } from './system-data.js'
 
 /**
  * Default layout and groups
@@ -7,11 +8,26 @@ export let DEFAULTS = null
 
 Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
   const groups = GROUP
+  const techniqueEntries = getTechniqueTypeEntries()
+
+  techniqueEntries.forEach((entry) => {
+    if (!groups[entry.id]) {
+      groups[entry.id] = { id: entry.id, name: entry.translationKey ?? entry.label ?? entry.id, type: 'system' }
+    } else if (!groups[entry.id].name) {
+      groups[entry.id].name = entry.translationKey ?? entry.label ?? entry.id
+    }
+  })
+
   Object.values(groups).forEach(group => {
     group.name = coreModule.api.Utils.i18n(group.name)
     group.listName = `Group: ${coreModule.api.Utils.i18n(group.listName ?? group.name)}`
   })
   const groupsArray = Object.values(groups)
+  const techniqueGroups = techniqueEntries.map((entry) => {
+    const group = groups[entry.id]
+    const suffix = String(entry.actorKey ?? entry.id).replace(/[^a-zA-Z0-9]+/g, '_')
+    return { ...group, nestId: `techniques_${suffix}` }
+  })
   DEFAULTS = {
     layout: [
       {
@@ -50,20 +66,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         nestId: 'techniques',
         id: 'techniques',
         name: coreModule.api.Utils.i18n('l5r5e.techniques.title'),
-        groups: [
-          { ...groups.school_ability, nestId: 'techniques_school' },
-          { ...groups.mastery_ability, nestId: 'techniques_mastery' },
-          { ...groups.kata, nestId: 'techniques_kata' },
-          { ...groups.kiho, nestId: 'techniques_kiho' },
-          { ...groups.inversion, nestId: 'techniques_inversion' },
-          { ...groups.invocation, nestId: 'techniques_invocation' },
-          { ...groups.ritual, nestId: 'techniques_ritual' },
-          { ...groups.shuji, nestId: 'techniques_shuji' },
-          { ...groups.maho, nestId: 'techniques_maho' },
-          { ...groups.ninjutsu, nestId: 'techniques_ninjutsu' },
-          { ...groups.mantra, nestId: 'techniques_mantra' },
-          { ...groups.title_ability, nestId: 'techniques_title' }
-        ]
+        groups: techniqueGroups
       },
       {
         nestId: 'utility',

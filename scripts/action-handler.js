@@ -1,5 +1,6 @@
-import { ACTION_TYPE, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
-import { Utils } from './utils.js'
+
+import { ACTION_TYPE, GROUP,ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
+import { getAttributeEntries, getInventoryGroupEntries, getTechniqueTypeEntries, sanitizeId } from './system-data.js'
 
 export function createActionHandlerClass(api) {
   return class ActionHandler extends api.ActionHandler {
@@ -30,30 +31,17 @@ export function createActionHandlerClass(api) {
         let items = this.actor.items
         items = api.Utils.sortItemsByName(items)
         this.items = items
+
+        this.inventoryGroups = this.#createEntryMap(getInventoryGroupEntries())
+        this.inventorygroupIds = [...this.inventoryGroups.keys()]
+
+        const techniqueEntries = getTechniqueTypeEntries()
+        this.techniqueGroups = this.#createEntryMap(techniqueEntries)
+        this.techniqueGroupIds = [...this.techniqueGroups.keys()]
+        this.techniqueTypeKeys = new Set(techniqueEntries.flatMap((entry) => [entry.actorKey ?? entry.id, entry.id]))
       }
 
       if (this.actorType === 'character' || this.actorType === 'npc') {
-        this.inventorygroupIds = [
-          'armor',
-          'equipment',
-          'weapons'
-        ]
-
-        this.techniqueGroupIds = [
-          'kata',
-          'kiho',
-          'inversion',
-          'invocation',
-          'ritual',
-          'shuji',
-          'maho',
-          'ninjutsu',
-          'mantra',
-          'school-ability',
-          'mastery-ability',
-          'title-ability'
-        ]
-
         await this.#buildCharacterActions()
       } else if (!this.actor) {
         this.#buildMultipleTokenActions()
@@ -70,6 +58,8 @@ export function createActionHandlerClass(api) {
         this.#buildTechniques()
       ])
       this.#buildRings()
+      this.#buildDerivedAttributes()
+      this.#buildStandingAttributes()
       this.#buildSkills()
     }
 
@@ -225,25 +215,14 @@ export function createActionHandlerClass(api) {
         }
       }
 
-      // Create group name mappings
-      const groupNameMappings = {
-        equipment: api.Utils.i18n('l5r5e.items.title'),
-        armor: api.Utils.i18n('l5r5e.armors.title'),
-        weapons: api.Utils.i18n('l5r5e.weapons.title')
-      }
-
       // Loop through inventory subcateogry ids
       for (const groupId of this.inventorygroupIds) {
         if (!inventoryMap.has(groupId)) continue
 
-        // Create group data
-        const groupData = {
-          id: groupId,
-          name: groupNameMappings[groupId],
-          type: 'system'
-        }
-
         const inventory = inventoryMap.get(groupId)
+        if (!inventory) continue
+
+        const groupData = this.#getGroupData(groupId, this.inventoryGroups)
 
         // Build actions
         await this.#buildActions(inventory, groupData, groupId)
@@ -492,22 +471,21 @@ export function createActionHandlerClass(api) {
         const isTechnique = this.#isTechnique(value)
 
         if (isTechnique) {
-          const technique_type = String(value.system.technique_type).replace('_', '-')
+          const technique_type = sanitizeId(value.system.technique_type)
 
           if (!techniqueMap.has(technique_type)) techniqueMap.set(technique_type, new Map())
           techniqueMap.get(technique_type).set(key, value)
         }
       }
 
+      const groupIds = [...new Set([...this.techniqueGroupIds, ...techniqueMap.keys()])]
+
       // Loop through inventory subcateogry ids
-      for (const groupId of this.techniqueGroupIds) {
+      for (const groupId of groupIds) {
         if (!techniqueMap.has(groupId)) continue
 
         // Create group data
-        const groupData = {
-          id: groupId,
-          type: 'system'
-        }
+        const groupData = this.#getGroupData(groupId, this.techniqueGroups, { fallbackPrefix: 'l5r5e.techniques' })
 
         const techniques = techniqueMap.get(groupId)
 
@@ -574,10 +552,212 @@ export function createActionHandlerClass(api) {
 
       if (type !== 'technique') return false
 
-      const techniqueTypes = ['kata', 'kiho', 'inversion', 'invocation', 'ritual', 'shuji', 'maho', 'ninjutsu', 'mantra', 'school_ability', 'mastery_ability', 'title_ability']
-      if (!techniqueTypes.includes(item.system.technique_type)) return false
+      if (!this.techniqueTypeKeys || this.techniqueTypeKeys.size === 0) return true
 
-      return true
+      const techniqueType = item.system.technique_type
+      if (!techniqueType) return false
+
+      return this.techniqueTypeKeys.has(techniqueType) || this.techniqueTypeKeys.has(sanitizeId(techniqueType))
+    }
+
+    #buildDerivedAttributes() {
+      this.#buildAttributeGroup('derived')
+    }
+
+    #buildStandingAttributes() {
+      this.#buildAttributeGroup('standing')
+    }
+
+    #buildAttributeGroup(attributeType) {
+      if (!this.actor) return
+
+      const { entries, section } = getAttributeEntries(attributeType, this.actor)
+      if (!section || entries.length === 0) return
+
+      const actions = entries
+        .map((entry) => this.#createAttributeAction(entry, section, attributeType))
+        .filter((action) => !!action)
+
+      if (actions.length === 0) return
+
+      const groupData = this.#getAttributeGroupData(attributeType)
+
+      this.addActions(actions, groupData)
+    }
+
+    #createAttributeAction(entry, section, attributeType) {
+      const data = this.#resolveAttributeData(section, entry)
+      if (data === undefined) return null
+
+      const value = this.#formatAttributeValue(data)
+      const hasValue = value !== ''
+      const label = this.#localizeEntryName(entry, attributeType)
+
+      const name = hasValue ? `${label}: ${value}` : label
+      const prefix = api.Utils.i18n(ACTION_TYPE[attributeType] ?? GROUP?.[attributeType]?.name ?? '')
+      const listName = prefix ? `${prefix}: ${name}` : name
+      const encodedValue = [attributeType, entry.actorKey ?? entry.id].join(this.delimiter)
+
+      const action = {
+        id: entry.id,
+        name,
+        encodedValue,
+        listName
+      }
+
+      if (hasValue) {
+        action.info1 = { text: value }
+      }
+
+      return action
+    }
+
+    #resolveAttributeData(section, entry) {
+      const candidatePaths = []
+
+      if (entry.path) candidatePaths.push(entry.path)
+
+      const keys = [entry.actorKey, entry.id]
+      keys.forEach((key) => {
+        if (!key) return
+        candidatePaths.push(key)
+        candidatePaths.push(String(key).replace(/-/g, '_'))
+      })
+
+      for (const path of candidatePaths) {
+        const value = this.#getProperty(section, path)
+        if (value !== undefined) return value
+      }
+
+      return undefined
+    }
+
+    #formatAttributeValue(data) {
+      if (data === null || data === undefined) return ''
+
+      if (typeof data === 'number' || typeof data === 'string') {
+        return String(data)
+      }
+
+      const primary = this.#firstDefined(data.value, data.current, data.rank, data.score, data.points, data.amount, data.total)
+      const maximum = this.#firstDefined(data.max, data.maximum, data.cap, data.limit, data.maxValue, data.maximumValue)
+
+      if (primary !== undefined && maximum !== undefined) {
+        return `${primary}/${maximum}`
+      }
+
+      if (primary !== undefined) {
+        return String(primary)
+      }
+
+      if (data.current !== undefined && data.max !== undefined) {
+        return `${data.current}/${data.max}`
+      }
+
+      if (data.current !== undefined) {
+        return String(data.current)
+      }
+
+      if (data.rank !== undefined && data.cap !== undefined) {
+        return `${data.rank}/${data.cap}`
+      }
+
+      if (data.rank !== undefined) {
+        return String(data.rank)
+      }
+
+      const numericValues = Object.values(data).filter((value) => typeof value === 'number')
+      if (numericValues.length === 1) {
+        return String(numericValues[0])
+      }
+
+      if (numericValues.length > 1) {
+        return numericValues.join('/')
+      }
+
+      return ''
+    }
+
+    #localizeEntryName(entry, attributeType) {
+      const translation = entry.translationKey
+      if (translation) return api.Utils.i18n(translation)
+
+      if (entry.label) return api.Utils.i18n(entry.label)
+
+      const prefix = (attributeType === 'standing') ? 'l5r5e.social' : 'l5r5e.attributes'
+      const key = entry.actorKey ?? entry.id
+      if (key) {
+        const translationKey = `${prefix}.${String(key).replace(/-/g, '_').toLowerCase()}`
+        return api.Utils.i18n(translationKey)
+      }
+
+      return entry.id
+    }
+
+    #getGroupData(groupId, groupMap, { fallbackPrefix } = {}) {
+      const entry = groupMap?.get(groupId)
+
+      let nameKey = entry?.translationKey
+      let labelKey = entry?.label
+
+      if (!nameKey && fallbackPrefix) {
+        const actorKey = entry?.actorKey ?? groupId
+        nameKey = `${fallbackPrefix}.${String(actorKey).replace(/-/g, '_').toLowerCase()}`
+      }
+
+      const fallbackGroupName = GROUP?.[groupId]?.name
+      const name = nameKey
+        ? api.Utils.i18n(nameKey)
+        : labelKey
+          ? api.Utils.i18n(labelKey)
+          : fallbackGroupName
+            ? api.Utils.i18n(fallbackGroupName)
+            : this.#humanize(groupId)
+
+      return {
+        id: groupId,
+        name,
+        type: 'system'
+      }
+    }
+
+    #getAttributeGroupData(attributeType) {
+      const groupId = attributeType
+      const nameKey = GROUP?.[groupId]?.name
+      return {
+        id: groupId,
+        name: nameKey ? api.Utils.i18n(nameKey) : groupId,
+        type: 'system'
+      }
+    }
+
+    #firstDefined(...values) {
+      return values.find((value) => value !== undefined && value !== null)
+    }
+
+    #getProperty(object, path) {
+      if (!object || !path) return undefined
+      if (Object.hasOwn(object, path)) return object[path]
+
+      const keys = String(path).split('.')
+      let result = object
+      for (const key of keys) {
+        if (result === null || result === undefined) return undefined
+        result = result[key]
+      }
+      return result
+    }
+
+    #createEntryMap(entries) {
+      return new Map(entries.map((entry) => [entry.id, entry]))
+    }
+
+    #humanize(value) {
+      return String(value ?? '')
+        .split(/[-_]/)
+        .filter((part) => part.length > 0)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ')
     }
 
     /**
