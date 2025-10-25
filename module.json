@@ -14,7 +14,7 @@
   ],
   "url": "https://github.com/DonHuberto/fvtt-token-action-hud-l5r5e",
   "flags": {},
-  "version": "1.3.0",
+  "version": "1.4.0",
   "compatibility": {
     "minimum": "13",
     "verified": "13"
@@ -38,7 +38,10 @@
     "systems": [
       {
         "id": "l5r5e",
-        "type": "system"
+        "type": "system",
+        "compatibility": {
+          "minimum": "1.13.2"
+        }
       }
     ],
     "requires": [
@@ -47,7 +50,8 @@
         "type": "module",
         "compatibility": {
           "minimum": "2.0.12"
-        }
+        },
+        "manifest": "https://raw.githubusercontent.com/Larkinabout/fvtt-token-action-hud-core/master/module.json"
       },
       {
         "id": "socketlib",
