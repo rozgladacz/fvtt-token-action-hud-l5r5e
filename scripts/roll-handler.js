@@ -191,13 +191,16 @@ export function createRollHandlerClass(api) {
         }
       }
 
+      const fallbackKey = 'tokenActionHud.l5r5e.messages.itemChatFallback'
+      const fallbackMessage = game.i18n.format(fallbackKey, { item: item.name })
+
       if (typeof ChatMessage?.create === 'function') {
         await ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor }),
-          content: game.i18n.format('tokenActionHud.l5r5e.itemChatFallback', { item: item.name })
+          content: fallbackMessage
         })
       } else {
-        ui.notifications?.warn(game.i18n.format('tokenActionHud.l5r5e.itemChatFallback', { item: item.name }))
+        ui.notifications?.warn(fallbackMessage)
       }
     }
 
@@ -381,7 +384,7 @@ export function createRollHandlerClass(api) {
         return fallbackResult
       }
 
-      const localizedPrimary = game.i18n?.localize?.('tokenActionHud.l5r5e.dicePickerError')
+      const localizedPrimary = game.i18n?.localize?.('tokenActionHud.l5r5e.messages.dicePickerError')
       const localizedSecondary = game.i18n?.localize?.('tokenActionHud.notifications.dicePickerError')
       const errorMessage = (localizedPrimary && localizedPrimary !== 'tokenActionHud.l5r5e.dicePickerError')
         ? localizedPrimary

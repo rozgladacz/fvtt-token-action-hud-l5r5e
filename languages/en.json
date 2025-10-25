@@ -2,7 +2,8 @@
   "tokenActionHud": {
     "l5r5e": {
       "messages": {
-        "itemChatFallback": "Unable to send {item} to chat."
+        "itemChatFallback": "Unable to send {item} to chat.",
+        "dicePickerError": "Unable to open the dice picker."
       },
       "settings": {
         "displayUnequipped": {
