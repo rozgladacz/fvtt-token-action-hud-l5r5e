@@ -14,6 +14,7 @@ Token Action HUD is a repositionable HUD of actions for a selected token.
 # Wymagania
 
 - Foundry VTT v13+
+- System Legend of the Five Rings 5e w wersji co najmniej 1.13.2 (wcześniejsze wydania są blokowane przez manifest)
 - [Token Action HUD Core](https://foundryvtt.com/packages/token-action-hud-core) w wersji co najmniej 2.0.12
 - [socketlib](https://foundryvtt.com/packages/socketlib)
 
