@@ -1,4 +1,6 @@
 {
+  "name": "token-action-hud-l5r5e",
+  "version": "2.0.0",
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -wcm"

@@ -4,6 +4,8 @@
 
 Token Action HUD is a repositionable HUD of actions for a selected token.
 
+**Compatibility:** Compatible with Foundry Virtual Tabletop version 13 and the Legend of the Five Rings 5e system version 1.13.2.
+
 # Features
 - Make rolls directly from the HUD instead of opening your character sheet.
 - Use items from the HUD or right-click an item to open its sheet.
@@ -34,7 +36,7 @@ Ten fork zachowuje kompatybilność z Foundry VTT v13 oraz systemem Legend of th
 ## Method 2
 1. On Foundry VTT's **Configuration and Setup** screen, go to **Add-on Modules**
 2. Click **Install Module**
-3. In the Manifest URL field, paste: `https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/releases/download/v1.5.0/module.json`
+3. In the Manifest URL field, paste: `https://github.com/rozgladacz/fvtt-token-action-hud-l5r5e/releases/download/v2.0.0/module.json`
 4. Click **Install** next to the pasted Manifest URL
 5. Install or update the required modules (Token Action HUD Core ≥2.0.12, socketlib) if prompted
 
@@ -58,6 +60,12 @@ Pull requests are welcome. Please include a reason for the request or create an 
 Thank you to the Community Helpers on Foundry's Discord who provide tireless support for people seeking help with the HUD.
 
 # Release Notes
+
+## 2.0.0
+
+- Maintenance release for Foundry VTT v13 compatibility
+- Verified support for the Legend of the Five Rings 5e system v1.13.2
+- Requires Token Action HUD Core v2.0.12 or newer
 
 ## 1.3.0
 
