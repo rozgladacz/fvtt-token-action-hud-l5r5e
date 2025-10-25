@@ -316,46 +316,167 @@ export function createActionHandlerClass(api) {
      * @private
      */
     #buildSkills() {
-      if (this.actorType !== 'character') return
+      if (!['character', 'npc'].includes(this.actorType)) return
 
       const actionType = 'skill'
-      const categoriesSkillsList = game.l5r5e.HelpersL5r5e.getCategoriesSkillsList()
+      const categories = this.#getActorSkillCategories()
 
-      for (const [catId, skills] of categoriesSkillsList) {
+      for (const category of categories) {
+        const catId = category.id
         try {
-          // Create group data
           const groupData = {
             id: catId,
-            name: `${api.Utils.i18n(`l5r5e.skills.${catId}.title`)}` ?? catId,
+            name: category.label,
             type: 'system'
           }
 
-          // Create actions list
-          const actions = Object.entries(skills).map((skill) => {
-            const id = skill[1]
-            const encodedValue = [actionType, id].join(this.delimiter)
-            const value = this.actor.system.skills[catId][id]
-            const name = `${api.Utils.i18n(`l5r5e.skills.${catId}.${id}`)}: ${value}` ?? ''
+          const actions = category.skills.map((skillId) => {
+            const encodedValue = [actionType, skillId].join(this.delimiter)
+            const value = this.#getActorSkillValue(catId, skillId)
+            const localizedSkill = this.#getSkillLabel(catId, skillId)
+            const hasValue = value !== '' && value !== null && value !== undefined
+            const name = hasValue ? `${localizedSkill}: ${value}` : localizedSkill
             const actionTypeName = `${api.Utils.i18n('l5r5e.skills.label')}: ` ?? ''
             const listName = `${actionTypeName}${name}`
 
             return {
-              id,
+              id: skillId,
               name,
               encodedValue,
               listName
             }
           })
 
-          // Add actions to HUD
           this.addActions(actions, groupData)
-
         } catch (error) {
           api.Logger.error(catId)
           return null
         }
-
       }
+    }
+
+    #getActorSkillCategories() {
+      const helpers = game.l5r5e?.HelpersL5r5e ?? {}
+      const baseSource = this.actorType === 'npc'
+        ? helpers.getNpcSkillsList?.(this.actor)
+          ?? helpers.getNpcSkillsList?.()
+          ?? helpers.getCategoriesSkillsList?.(this.actor)
+          ?? helpers.getCategoriesSkillsList?.()
+          ?? this.actor?.system?.skills
+          ?? this.actor?.system?.npcSkills
+        : helpers.getCategoriesSkillsList?.(this.actor)
+          ?? helpers.getCategoriesSkillsList?.()
+          ?? this.actor?.system?.skills
+
+      const entries = this.#normalizeCategoryEntries(baseSource)
+
+      return entries.map(([categoryId, skills]) => {
+        const skillIds = this.#normalizeSkillIds(skills)
+        return {
+          id: categoryId,
+          label: this.#getSkillCategoryLabel(categoryId),
+          skills: skillIds
+        }
+      }).filter((category) => category.skills.length > 0)
+    }
+
+    #normalizeCategoryEntries(source) {
+      if (!source) return []
+      if (source instanceof Map) return [...source.entries()]
+      if (Array.isArray(source)) {
+        return source.map((entry, index) => Array.isArray(entry) ? entry : [index, entry])
+      }
+      if (typeof source === 'object') return Object.entries(source)
+      return []
+    }
+
+    #normalizeSkillIds(skills) {
+      if (!skills) return []
+      if (skills instanceof Map) {
+        return this.#dedupeIds([...skills.values()])
+      }
+      if (Array.isArray(skills)) {
+        return this.#dedupeIds(skills.flatMap((entry) => this.#normalizeSkillIds(entry)))
+      }
+      if (typeof skills === 'string') return this.#dedupeIds([skills])
+      if (typeof skills === 'object') {
+        if (skills.id) return this.#normalizeSkillIds(skills.id)
+        if (skills.key) return this.#normalizeSkillIds(skills.key)
+        if (skills.value) return this.#normalizeSkillIds(skills.value)
+        if (skills.default) return this.#normalizeSkillIds(skills.default)
+        return this.#dedupeIds(Object.values(skills).flatMap((entry) => this.#normalizeSkillIds(entry)))
+      }
+      return []
+    }
+
+    #dedupeIds(list) {
+      return [...new Set(list.filter((value) => typeof value === 'string' && value))]
+    }
+
+    #getSkillCategoryLabel(categoryId) {
+      const keys = [
+        `l5r5e.npc.skills.${categoryId}.title`,
+        `l5r5e.skills.${categoryId}.title`,
+        `l5r5e.skills.${categoryId}`,
+        categoryId
+      ]
+      return this.#localizeFirst(keys)
+    }
+
+    #getSkillLabel(categoryId, skillId) {
+      const keys = [
+        `l5r5e.npc.skills.${categoryId}.${skillId}`,
+        `l5r5e.skills.${categoryId}.${skillId}`,
+        `l5r5e.skills.${skillId}`,
+        `l5r5e.skill.${skillId}`,
+        skillId
+      ]
+      return this.#localizeFirst(keys)
+    }
+
+    #getActorSkillValue(categoryId, skillId) {
+      const sources = [
+        this.actor?.system?.skills,
+        this.actor?.system?.npcSkills,
+        this.actor?.system?.npc?.skills,
+        this.actor?.system?.skillRanks,
+        this.actor?.system?.skillGroups,
+        this.actor?.system?.skill_groups
+      ]
+
+      for (const source of sources) {
+        const category = source?.[categoryId]
+        if (!category) continue
+        const skill = category?.[skillId]
+        const value = this.#resolveSkillValue(skill)
+        if (value !== null && value !== undefined) return value
+      }
+
+      const directSkill = this.actor?.system?.skills?.[skillId]
+      const directValue = this.#resolveSkillValue(directSkill)
+      if (directValue !== null && directValue !== undefined) return directValue
+
+      return ''
+    }
+
+    #resolveSkillValue(skill) {
+      if (skill === null || skill === undefined) return null
+      if (typeof skill === 'number' || typeof skill === 'string') return skill
+      if (typeof skill === 'object') {
+        for (const key of ['value', 'rank', 'dice', 'level', 'rating']) {
+          if (skill[key] !== undefined) return skill[key]
+        }
+      }
+      return null
+    }
+
+    #localizeFirst(keys) {
+      for (const key of keys) {
+        if (!key) continue
+        const localized = api.Utils.i18n(key)
+        if (localized && localized !== key) return localized
+      }
+      return keys[keys.length - 1] ?? ''
     }
 
     /**
