@@ -1,4 +1,4 @@
-import { ACTION_TYPE } from './constants.js'
+import { ACTION_TYPE, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
 import { Utils } from './utils.js'
 
 export function createActionHandlerClass(api) {
@@ -755,6 +755,9 @@ export function createActionHandlerClass(api) {
       const type = entity?.type
       const rarity = entity?.system?.rarity ?? null
       const traits = this.#getItemQualities(entity?.system?.properties)
+      const patterns = this.#getItemPatterns(entity?.system?.patterns)
+      const tags = this.#getItemTags(entity?.system?.tags)
+      const bonuses = this.#getItemBonuses(entity?.system?.bonuses)
       const range = (entity?.type === 'weapon') ? entity?.system?.range : null
       const damage = (entity?.type === 'weapon') ? entity?.system?.damage : null
       const deadliness = (entity?.type === 'weapon') ? entity?.system?.deadliness : null
@@ -762,15 +765,39 @@ export function createActionHandlerClass(api) {
       const grip2 = (entity?.type === 'weapon') ? entity?.system?.grip_2 : null
       const physical = (entity?.type === 'armor') ? entity?.system?.armor?.physical : null
       const supernatural = (entity?.type === 'armor') ? entity?.system?.armor?.supernatural : null
-      return { name, type, description, modifiers, properties, rarity, traits, range, damage, deadliness, grip1, grip2, physical, supernatural }
+      return { name, type, description, modifiers, properties, rarity, traits, patterns, tags, bonuses, range, damage, deadliness, grip1, grip2, physical, supernatural }
     }
 
     #getItemQualities(itemProperties) {
       if (!itemProperties) return null
-      return Object.entries(itemProperties)
-        .map(([_id, quality]) => {
-          return quality.name
+      const qualities = Object.entries(itemProperties)
+        .filter(([_, quality]) => {
+          if (typeof quality === 'boolean') return quality
+          if (typeof quality === 'object') {
+            if (quality?.value === false) return false
+            if (quality?.active === false) return false
+          }
+          return true
         })
+        .map(([id, quality]) => {
+          const labelKey = ITEM_QUALITIES[id]
+          const fallback = quality?.label ?? quality?.name ?? this.#formatLabel(id)
+          const label = labelKey ?? fallback
+          const localized = Boolean(!labelKey && fallback)
+
+          const resolved = (!localized && label)
+            ? api.Utils.i18n(label)
+            : label
+
+          if (!resolved || resolved === label && labelKey && fallback) {
+            return fallback
+          }
+
+          return resolved
+        })
+        .filter(Boolean)
+
+      return (qualities.length > 0) ? qualities : null
     }
 
     /**
@@ -791,25 +818,38 @@ export function createActionHandlerClass(api) {
       const description = tooltipData?.descriptionLocalised ??
         await TextEditor.enrichHTML(api.Utils.i18n(tooltipData?.description ?? ''), { async: true })
 
-      const rarityHtml = tooltipData?.rarity
-        ? `<div class="tah-tags-wrapper"><span class="tah-tag ${this.#getItemRarity(tooltipData.rarity)}">Rarity: ${tooltipData.rarity}</span></div>`
-        : ''
-
-      const propertiesHtml = tooltipData?.traits
+      const propertiesHtml = tooltipData?.traits?.length
         ? `<div class="tah-properties">${tooltipData.traits.map(trait => `<span class="tah-property">${trait}</span>`).join('')}</div>`
         : ''
 
-      const weaponStatsHtml = tooltipData.type === "weapon" ? this.#getWeaponStats(tooltipData) : ''
-      const gripModHtml = tooltipData.type === "weapon" ? this.#getGripMod(tooltipData) : ''
-      const armorStatsHtml = tooltipData.type === "armor" ? this.#getArmorStats(tooltipData) : ''
+      const rarityTag = tooltipData?.rarity
+        ? [{
+          label: 'tokenActionHud.l5r5e.tooltip.rarity',
+          value: tooltipData.rarity,
+          class: this.#getItemRarity(tooltipData.rarity)
+        }]
+        : []
 
+      const weaponStatsTags = tooltipData.type === 'weapon' ? this.#getWeaponStats(tooltipData) : []
+      const gripModTags = tooltipData.type === 'weapon' ? this.#getGripMod(tooltipData) : []
+      const armorStatsTags = tooltipData.type === 'armor' ? this.#getArmorStats(tooltipData) : []
+      const patternTags = tooltipData.patterns ?? []
+      const customTags = tooltipData.tags ?? []
+      const bonusTags = tooltipData.bonuses ?? []
+
+      const tagGroups = [
+        rarityTag,
+        weaponStatsTags,
+        gripModTags,
+        armorStatsTags,
+        patternTags,
+        customTags,
+        bonusTags
+      ].flat()
+
+      const tagsHtml = this.#renderTagCollection(tagGroups)
       const modifiersHtml = ''
-
-      const tagsJoined = [rarityHtml, weaponStatsHtml, gripModHtml, armorStatsHtml].join('')
-
-      const tagsHtml = (tagsJoined) ? `<div class="tah-tags">${tagsJoined}</div>` : ''
-
-      const headerTags = (tagsHtml || modifiersHtml) ? `<div class="tah-tags-wrapper">${tagsHtml}${modifiersHtml}</div>` : ''
+      const headerTags = (tagsHtml || modifiersHtml) ? `<div class="tah-tags-wrapper">${tagsHtml ?? ''}${modifiersHtml}</div>` : ''
 
       if (!description && !tagsHtml && !modifiersHtml) return name
 
@@ -827,22 +867,217 @@ export function createActionHandlerClass(api) {
     }
 
     #getWeaponStats(tooltipData) {
-      const range = `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.range`)}: ${tooltipData.range}</span>`
-      const damage = `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.damage`)}: ${tooltipData.damage}</span>`
-      const deadliness = `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.deadliness`)}: ${tooltipData.deadliness}</span>`
-      return [range, damage, deadliness].join('')
+      const range = tooltipData.range
+        ? { label: 'l5r5e.weapons.range', value: tooltipData.range }
+        : null
+      const damage = tooltipData.damage
+        ? { label: 'l5r5e.weapons.damage', value: tooltipData.damage }
+        : null
+      const deadliness = tooltipData.deadliness
+        ? { label: 'l5r5e.weapons.deadliness', value: tooltipData.deadliness }
+        : null
+
+      return [range, damage, deadliness].filter(Boolean)
     }
 
     #getGripMod(tooltipData) {
-      const grip1 = tooltipData.grip1 && tooltipData.grip1 !== 'N/A' ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.1hand`)}: ${tooltipData.grip1}</span>` : ''
-      const grip2 = tooltipData.grip2 && tooltipData.grip2 !== 'N/A' ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.2hand`)}: ${tooltipData.grip2}</span>` : ''
-      return [grip1, grip2].join('')
+      const grip1 = tooltipData.grip1 && tooltipData.grip1 !== 'N/A'
+        ? { label: 'l5r5e.weapons.1hand', value: tooltipData.grip1 }
+        : null
+      const grip2 = tooltipData.grip2 && tooltipData.grip2 !== 'N/A'
+        ? { label: 'l5r5e.weapons.2hand', value: tooltipData.grip2 }
+        : null
+      return [grip1, grip2].filter(Boolean)
     }
 
     #getArmorStats(tooltipData) {
-      const physical = tooltipData?.physical && tooltipData?.physical > 0 ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.armors.physical`)}: ${tooltipData?.physical}</span>` : ''
-      const supernatural = tooltipData?.supernatural && tooltipData?.supernatural > 0 ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.armors.supernatural`)}: ${tooltipData?.supernatural}</span>` : ''
-      return [physical, supernatural].join('')
+      const physical = tooltipData?.physical && tooltipData?.physical > 0
+        ? { label: 'l5r5e.armors.physical', value: tooltipData?.physical }
+        : null
+      const supernatural = tooltipData?.supernatural && tooltipData?.supernatural > 0
+        ? { label: 'l5r5e.armors.supernatural', value: tooltipData?.supernatural }
+        : null
+      return [physical, supernatural].filter(Boolean)
+    }
+
+    #getItemPatterns(patterns) {
+      const entries = this.#normalisePropertyEntries(patterns)
+      if (!entries.length) return null
+
+      const definition = ITEM_TAGS.pattern ?? ITEM_TAGS.default
+      const icon = definition?.icon ?? ITEM_TAGS.default?.icon
+      const cssClass = definition?.class ?? ITEM_TAGS.default?.class
+
+      const tags = entries
+        .map(entry => {
+          if (!entry) return null
+          const data = (typeof entry === 'object') ? entry : { id: entry }
+          const id = data?.id ?? data?.key ?? data?.slug ?? data?.name
+          if (!id) return null
+
+          const isActive = (data?.active ?? data?.enabled ?? data?.value ?? true) !== false
+          if (!isActive) return null
+
+          const labelKey = ITEM_PATTERN[id]
+          const fallback = data?.label ?? data?.name ?? this.#formatLabel(id)
+
+          if (!labelKey && !fallback) return null
+
+          return {
+            label: labelKey ?? fallback,
+            localized: !labelKey && Boolean(fallback),
+            fallback,
+            icon,
+            class: cssClass
+          }
+        })
+        .filter(Boolean)
+
+      return tags.length ? tags : null
+    }
+
+    #getItemTags(tags) {
+      const entries = this.#normalisePropertyEntries(tags)
+      if (!entries.length) return null
+
+      return entries
+        .map(entry => {
+          if (!entry) return null
+          const data = (typeof entry === 'object') ? entry : { id: entry }
+          const id = data?.id ?? data?.key ?? data?.slug ?? data?.type ?? data?.name
+          if (!id) return null
+
+          const isActive = (data?.active ?? data?.enabled ?? data?.value ?? true) !== false
+          if (!isActive) return null
+
+          const definition = ITEM_TAGS[id] ?? ITEM_TAGS.default
+          const labelKey = definition?.label ?? (id ? `tokenActionHud.l5r5e.tags.${id}` : null)
+          const fallback = data?.label ?? data?.name ?? this.#formatLabel(id)
+          const rawValue = (data?.amount ?? data?.rating ?? data?.value)
+          const value = (typeof rawValue === 'number' || typeof rawValue === 'string') ? rawValue : undefined
+
+          if (!labelKey && !fallback) return null
+
+          return {
+            label: labelKey ?? fallback,
+            localized: !labelKey && Boolean(fallback),
+            fallback,
+            value,
+            icon: definition?.icon ?? ITEM_TAGS.default?.icon,
+            class: definition?.class ?? ITEM_TAGS.default?.class
+          }
+        })
+        .filter(Boolean)
+    }
+
+    #getItemBonuses(bonuses) {
+      const entries = this.#normalisePropertyEntries(bonuses)
+      if (!entries.length) return null
+
+      const defaultDefinition = ITEM_TAGS.bonus ?? ITEM_TAGS.default
+
+      const tags = entries
+        .map(entry => {
+          if (!entry) return null
+          const data = (typeof entry === 'object') ? entry : { id: entry }
+          const id = data?.id ?? data?.key ?? data?.slug ?? data?.type ?? data?.name
+          if (!id) return null
+
+          const isActive = (data?.active ?? data?.enabled ?? true) !== false
+          if (!isActive) return null
+
+          const definition = ITEM_BONUS[id] ?? defaultDefinition
+          const labelKey = definition?.label ?? (id ? `tokenActionHud.l5r5e.bonuses.${id}` : null)
+          const fallback = data?.label ?? data?.name ?? this.#formatLabel(id)
+          const rawValue = data?.value ?? data?.amount ?? data?.bonus ?? data?.rating
+          const value = (typeof rawValue === 'number' || typeof rawValue === 'string') ? rawValue : undefined
+
+          if (!labelKey && !fallback && value === undefined) return null
+
+          return {
+            label: labelKey ?? fallback,
+            localized: !labelKey && Boolean(fallback),
+            fallback,
+            value,
+            icon: definition?.icon ?? defaultDefinition?.icon,
+            class: definition?.class ?? defaultDefinition?.class
+          }
+        })
+        .filter(Boolean)
+
+      return tags.length ? tags : null
+    }
+
+    #renderTagCollection(tags) {
+      if (!tags || tags.length === 0) return ''
+
+      const html = tags
+        .map(tag => this.#renderTag(tag))
+        .filter(Boolean)
+        .join('')
+
+      if (!html) return ''
+
+      return `<div class="tah-tags">${html}</div>`
+    }
+
+    #renderTag(tag) {
+      if (!tag) return ''
+
+      const classList = ['tah-tag']
+      if (tag.class) classList.push(tag.class)
+      const className = classList.filter(Boolean).join(' ')
+
+      const icon = tag.icon ? `<i class="${tag.icon}" aria-hidden="true"></i>` : ''
+
+      if (tag.text) {
+        return `<span class="${className}">${icon}${icon ? `<span class="tah-tag-text">${tag.text}</span>` : tag.text}</span>`
+      }
+
+      const labelKey = tag.label ?? ''
+      let label = ''
+      if (tag.localized) {
+        label = labelKey
+      } else if (labelKey) {
+        label = api.Utils.i18n(labelKey)
+        if (tag.fallback && label === labelKey) {
+          label = tag.fallback
+        }
+      }
+
+      if (!label) label = tag.fallback ?? ''
+      if (!label) return ''
+
+      const hasValue = tag.value !== undefined && tag.value !== null && tag.value !== ''
+      const text = hasValue ? `${label}: ${tag.value}` : label
+      const title = tag.title ? ` title="${tag.title}"` : ''
+      const content = icon ? `${icon}<span class="tah-tag-text">${text}</span>` : text
+
+      return `<span class="${className}"${title}>${content}</span>`
+    }
+
+    #normalisePropertyEntries(property) {
+      if (!property) return []
+      if (Array.isArray(property)) return property.filter(p => p !== null && p !== undefined)
+      if (property instanceof Set) return [...property]
+      if (typeof property === 'object') {
+        return Object.entries(property).map(([id, value]) => {
+          if (typeof value === 'object' && value !== null) {
+            return { id, ...value }
+          }
+          return { id, value }
+        })
+      }
+      return [property]
+    }
+
+    #formatLabel(label) {
+      if (!label || typeof label !== 'string') return ''
+      return label
+        .replace(/[-_]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, match => match.toUpperCase())
     }
   
   }
