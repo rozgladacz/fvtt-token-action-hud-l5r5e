@@ -150,12 +150,32 @@ export function createRollHandlerClass(api) {
      * @param {string} actionId The action id
      */
     async #handleStanceChangeAction(_event, actor, actionId) {
-      //console.log(game.l5r5e)
-      // if (actor.system.stance !== actionId) {
-      //   await new game.l5r5e.ActorL5r5e(actor).update({
-      //     stance: actionId
-      //   })
-      // }
+      const allowedTypes = ['character', 'npc']
+
+      const availableStances = Object.keys(CONFIG.l5r5e?.conflict?.stances ?? {})
+      if (availableStances.length > 0 && !availableStances.includes(actionId)) return
+
+      const actors = actor
+        ? [actor]
+        : canvas.tokens.controlled
+          .map((token) => token.actor)
+          .filter((tokenActor) => tokenActor && allowedTypes.includes(tokenActor.type))
+
+      if (!actors || actors.length === 0) return
+
+      for (const targetActor of actors) {
+        if (!allowedTypes.includes(targetActor.type)) continue
+
+        if (targetActor.system?.stance === actionId) continue
+
+        if (!targetActor.canUserModify?.(game.user, 'update')) continue
+
+        try {
+          await targetActor.update({ 'system.stance': actionId })
+        } catch (error) {
+          console.error(error)
+        }
+      }
     }
 
     /**
