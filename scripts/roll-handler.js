@@ -1,8 +1,5 @@
-import { getCoreApi } from './core-api.js'
-
-const coreApi = getCoreApi()
-
-export class RollHandler extends coreApi.RollHandler {
+export function createRollHandlerClass(api) {
+  return class RollHandler extends api.RollHandler {
     /**
      * Handle action click
      * Called by Token Action HUD Core when an action is left or right-clicked
@@ -203,4 +200,5 @@ export class RollHandler extends coreApi.RollHandler {
           break
       }
     }
+  }
 }

@@ -1,12 +1,13 @@
-import { ActionHandler } from './action-handler.js'
-import { RollHandler } from './roll-handler.js'
+import { createActionHandlerClass } from './action-handler.js'
+import { createRollHandlerClass } from './roll-handler.js'
 import { DEFAULTS } from './defaults.js'
 import * as systemSettings from './settings.js'
-import { getCoreApi } from './core-api.js'
 
-const coreApi = getCoreApi()
+export function createSystemManagerClass(api) {
+  const ActionHandler = createActionHandlerClass(api)
+  const RollHandler = createRollHandlerClass(api)
 
-export class SystemManager extends coreApi.SystemManager {
+  return class SystemManager extends api.SystemManager {
     /**
      * Returns an instance of the ActionHandler to Token Action HUD Core
      * Called by Token Action HUD Core
@@ -66,4 +67,6 @@ export class SystemManager extends coreApi.SystemManager {
     registerSettings(coreUpdate) {
       systemSettings.register(coreUpdate)
     }
+}
+  }
 }
