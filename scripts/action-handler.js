@@ -182,23 +182,25 @@ export function createActionHandlerClass(api) {
      * @private
      */
     async #buildInventory() {
-      if (this.items.size === 0) return
+      const itemEntries = this.#getItemEntries(this.items)
+      if (itemEntries.length === 0) return
 
       const inventoryMap = new Map()
 
-      for (const [key, value] of this.items) {
-        const equipped = value.system.equipped
-        const hasQuantity = value.system?.quantity > 0
+      for (const [key, value] of itemEntries) {
+        const quantity = this.#getItemQuantity(value)
+        const hasQuantity = quantity === null || quantity > 0
         const isEquippedItem = this.#isEquippedItem(value)
+        const isEquipped = this.#isItemEquipped(value)
         const type = value.type
 
         // Set items into maps
         if (hasQuantity) {
-          if (equipped) {
+          if (isEquipped) {
             if (!inventoryMap.has('equipped')) inventoryMap.set('equipped', new Map())
             inventoryMap.get('equipped').set(key, value)
           }
-          if (!equipped) {
+          if (!isEquipped) {
             if (!inventoryMap.has('unequipped')) inventoryMap.set('unequipped', new Map())
             inventoryMap.get('unequipped').set(key, value)
           }
@@ -875,9 +877,7 @@ export function createActionHandlerClass(api) {
       const type = item.type
       const excludedTypes = ['item', 'technique', 'peculiarity']
       if (this.displayUnequipped && !excludedTypes.includes(type)) return true
-      const equipped = item.system.equipped
-      if (equipped) return true
-      return false
+      return this.#isItemEquipped(item)
     }
 
     /**
@@ -1156,6 +1156,153 @@ export function createActionHandlerClass(api) {
         .join(' ')
     }
 
+    #getItemEntries(items) {
+      const source = items ?? []
+
+      if (Array.isArray(source)) {
+        return source
+          .map((item) => {
+            if (!item) return null
+            const fallbackId = sanitizeId(item?.name ?? '')
+            const key = item?.id ?? item?._id ?? (fallbackId || foundry.utils.randomID())
+            return [key, item]
+          })
+          .filter((entry) => Array.isArray(entry) && entry[1])
+      }
+
+      if (typeof source?.entries === 'function') {
+        return [...source.entries()].filter(([, item]) => !!item)
+      }
+
+      if (source instanceof Map) {
+        return [...source.entries()].filter(([, item]) => !!item)
+      }
+
+      if (typeof source === 'object' && source !== null) {
+        return Object.entries(source).filter(([, item]) => !!item && typeof item === 'object')
+      }
+
+      return []
+    }
+
+    #getItemQuantity(item) {
+      const system = item?.system ?? {}
+      const paths = [
+        'quantity',
+        'quantity.value',
+        'quantity.current',
+        'quantity.amount',
+        'quantity.count',
+        'qty',
+        'qty.value',
+        'count',
+        'count.value',
+        'amount',
+        'amount.value',
+        'stack',
+        'stack.value',
+        'stock',
+        'stock.value',
+        'details.quantity',
+        'details.qty',
+        'summary.quantity',
+        'summary.qty'
+      ]
+
+      for (const path of paths) {
+        const value = foundry.utils.getProperty(system, path)
+        const normalized = this.#normalizeNumber(value)
+        if (normalized !== null) return normalized
+      }
+
+      return null
+    }
+
+    #normalizeNumber(value) {
+      if (value === null || value === undefined) return null
+      if (typeof value === 'number') return Number.isNaN(value) ? null : value
+      if (typeof value === 'boolean') return value ? 1 : 0
+      if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (trimmed === '') return null
+        const parsed = Number(trimmed)
+        return Number.isNaN(parsed) ? null : parsed
+      }
+
+      if (typeof value === 'object') {
+        const keys = ['value', 'current', 'amount', 'count', 'quantity', 'max', 'min']
+        for (const key of keys) {
+          if (!(key in value)) continue
+          const normalized = this.#normalizeNumber(value[key])
+          if (normalized !== null) return normalized
+        }
+      }
+
+      return null
+    }
+
+    #isItemEquipped(item) {
+      const system = item?.system ?? {}
+      const values = [
+        system.equipped,
+        system?.equipped?.value,
+        system?.equipped?.status,
+        system?.equipped?.equipped,
+        system?.equipped?.isEquipped,
+        system?.equipped?.active,
+        system?.readied,
+        system?.readied?.value,
+        system?.ready,
+        system?.ready?.value,
+        system?.worn,
+        system?.worn?.value,
+        system?.wearing,
+        system?.wearing?.value,
+        system?.active,
+        system?.active?.value,
+        system?.state,
+        system?.state?.value,
+        system?.status
+      ]
+
+      for (const value of values) {
+        const normalized = this.#normalizeBoolean(value)
+        if (normalized !== null) return normalized
+      }
+
+      return false
+    }
+
+    #normalizeBoolean(value) {
+      if (value === null || value === undefined) return null
+      if (typeof value === 'boolean') return value
+      if (typeof value === 'number') {
+        if (Number.isNaN(value)) return null
+        if (value === 0) return false
+        if (value === 1) return true
+        return null
+      }
+
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase()
+        if (!normalized) return null
+        if (['true', 'equipped', 'worn', 'ready', 'readied', 'yes', 'active', 'on', 'enabled'].includes(normalized)) return true
+        if (['false', 'unequipped', 'stowed', 'stored', 'no', 'inactive', 'off', 'disabled'].includes(normalized)) return false
+        return null
+      }
+
+      if (typeof value === 'object') {
+        const keys = ['value', 'equipped', 'isEquipped', 'status', 'active', 'enabled', 'state']
+        for (const key of keys) {
+          if (!(key in value)) continue
+          const normalized = this.#normalizeBoolean(value[key])
+          if (normalized !== null) return normalized
+        }
+      }
+
+      return null
+    }
+
     /**
      * Build actions
      * @private
@@ -1164,15 +1311,15 @@ export function createActionHandlerClass(api) {
      * @param {string} actionType
      */
     async #buildActions(items, groupData, actionType = 'item') {
-      // Exit if there are no items
-      if (items.size === 0) return
-
       // Exit if there is no groupId
       const groupId = (typeof groupData === 'string' ? groupData : groupData?.id)
       if (!groupId) return
 
       // Get actions
-      const actions = await Promise.all([...items].map(async item => await this.#getAction(actionType, item[1])))
+      const entries = this.#getItemEntries(items)
+      if (entries.length === 0) return
+
+      const actions = await Promise.all(entries.map(async ([, entity]) => await this.#getAction(actionType, entity)))
 
       // Add actions to action list
       this.addActions(actions, groupData)
