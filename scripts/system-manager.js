@@ -67,6 +67,5 @@ export function createSystemManagerClass(api) {
     registerSettings(coreUpdate) {
       systemSettings.register(coreUpdate)
     }
-}
   }
 }
