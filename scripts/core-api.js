@@ -15,3 +15,19 @@ export function getCoreApi() {
   }
   return coreModule.api
 }
+
+export function getCoreApiIfAvailable() {
+  return game.modules.get(CORE_MODULE.ID)?.api ?? null
+}
+
+export function resolveCoreApi(payload = null) {
+  if (payload?.registerSystem || payload?.SystemManager) {
+    return payload
+  }
+
+  if (payload?.api?.registerSystem) {
+    return payload.api
+  }
+
+  return getCoreApiIfAvailable()
+}
