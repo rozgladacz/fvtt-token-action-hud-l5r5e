@@ -313,7 +313,10 @@ export function createActionHandlerClass(api) {
           const actions = category.skills.map((skillId) => {
             const encodedValue = [actionType, skillId].join(this.delimiter)
             const value = this.#getActorSkillValue(catId, skillId)
-            const localizedSkill = this.#getSkillLabel(catId, skillId)
+            const fallbackSkillLabel = category.skillLabels instanceof Map
+              ? category.skillLabels.get(skillId) ?? category.skillLabels.get(String(skillId))
+              : category.skillLabels?.[skillId] ?? category.skillLabels?.[String(skillId)]
+            const localizedSkill = this.#getSkillLabel(catId, skillId, fallbackSkillLabel)
             const hasValue = value !== '' && value !== null && value !== undefined
             const name = hasValue ? `${localizedSkill}: ${value}` : localizedSkill
             const actionTypeName = `${api.Utils.i18n('l5r5e.skills.label')}: ` ?? ''
@@ -338,36 +341,188 @@ export function createActionHandlerClass(api) {
     #getActorSkillCategories() {
       const helpers = game.l5r5e?.HelpersL5r5e ?? {}
       const baseSource = this.actorType === 'npc'
-        ? helpers.getNpcSkillsList?.(this.actor)
-          ?? helpers.getNpcSkillsList?.()
-          ?? helpers.getCategoriesSkillsList?.(this.actor)
-          ?? helpers.getCategoriesSkillsList?.()
-          ?? this.actor?.system?.skills
-          ?? this.actor?.system?.npcSkills
-        : helpers.getCategoriesSkillsList?.(this.actor)
-          ?? helpers.getCategoriesSkillsList?.()
-          ?? this.actor?.system?.skills
+        ? this.#resolveSkillSource(helpers, true)
+        : this.#resolveSkillSource(helpers, false)
 
       const entries = this.#normalizeCategoryEntries(baseSource)
 
-      return entries.map(([categoryId, skills]) => {
-        const skillIds = this.#normalizeSkillIds(skills)
-        return {
-          id: categoryId,
-          label: this.#getSkillCategoryLabel(categoryId),
-          skills: skillIds
-        }
-      }).filter((category) => category.skills.length > 0)
+      return entries
+        .map((entry) => {
+          if (!entry || !entry.id || !entry.skills || entry.skills.length === 0) return null
+          const label = this.#getSkillCategoryLabel(entry.id, entry.label)
+          return {
+            id: entry.id,
+            label,
+            skills: entry.skills,
+            skillLabels: entry.skillLabels
+          }
+        })
+        .filter((category) => category && category.skills.length > 0)
     }
 
     #normalizeCategoryEntries(source) {
       if (!source) return []
-      if (source instanceof Map) return [...source.entries()]
-      if (Array.isArray(source)) {
-        return source.map((entry, index) => Array.isArray(entry) ? entry : [index, entry])
+
+      const entries = []
+
+      const addEntry = (value, key) => {
+        const entry = this.#normalizeCategoryEntry(value, key)
+        if (entry && entry.id) entries.push(entry)
       }
-      if (typeof source === 'object') return Object.entries(source)
+
+      if (source instanceof Map) {
+        for (const [key, value] of source.entries()) addEntry(value, key)
+        return entries
+      }
+
+      if (Array.isArray(source)) {
+        source.forEach((value, index) => addEntry(value, index))
+        return entries
+      }
+
+      if (typeof source === 'object') {
+        Object.entries(source).forEach(([key, value]) => addEntry(value, key))
+        return entries
+      }
+
       return []
+    }
+
+    #normalizeCategoryEntry(entry, key) {
+      if (entry === null || entry === undefined) return null
+
+      const normalizedKey = typeof key === 'string' || typeof key === 'number' ? String(key) : undefined
+
+      if (Array.isArray(entry) && entry.length > 0) {
+        if (entry.length >= 2) {
+          const [idValue, skillsValue, labelValue] = entry
+          const { ids, labels } = this.#extractSkillIdsAndLabels(skillsValue)
+          const id = typeof idValue === 'string' || typeof idValue === 'number' ? String(idValue) : normalizedKey
+          const label = typeof labelValue === 'string' ? labelValue : entry.label ?? entry.name ?? null
+          return { id, label, skills: ids, skillLabels: labels }
+        }
+        const { ids, labels } = this.#extractSkillIdsAndLabels(entry)
+        return { id: normalizedKey, label: entry.label ?? entry.name ?? null, skills: ids, skillLabels: labels }
+      }
+
+      if (entry instanceof Set || entry instanceof Map) {
+        const { ids, labels } = this.#extractSkillIdsAndLabels(entry)
+        const label = entry.label ?? entry.name ?? entry.title ?? null
+        return { id: normalizedKey, label, skills: ids, skillLabels: labels }
+      }
+
+      if (typeof entry === 'object') {
+        const id = typeof entry.id === 'string' || typeof entry.id === 'number'
+          ? String(entry.id)
+          : typeof entry.key === 'string' || typeof entry.key === 'number'
+            ? String(entry.key)
+            : typeof entry.category === 'string' || typeof entry.category === 'number'
+              ? String(entry.category)
+              : typeof entry.type === 'string' || typeof entry.type === 'number'
+                ? String(entry.type)
+                : normalizedKey
+
+        const label = entry.label ?? entry.name ?? entry.title ?? entry.categoryLabel ?? entry.categoryName ?? null
+
+        const skillsSource = entry.skills
+          ?? entry.skillIds
+          ?? entry.skill_ids
+          ?? entry.skillList
+          ?? entry.skill_list
+          ?? entry.skillGroups
+          ?? entry.skill_groups
+          ?? entry.values
+          ?? entry.entries
+          ?? entry.list
+          ?? entry.items
+          ?? entry.data
+          ?? entry.set
+          ?? entry.group
+
+        const { ids, labels } = this.#extractSkillIdsAndLabels(skillsSource ?? entry)
+
+        return { id, label, skills: ids, skillLabels: labels }
+      }
+
+      if (typeof entry === 'string' || typeof entry === 'number') {
+        const { ids, labels } = this.#extractSkillIdsAndLabels([entry])
+        const id = normalizedKey ?? (ids.length === 1 ? ids[0] : String(entry))
+        return { id, label: null, skills: ids, skillLabels: labels }
+      }
+
+      return null
+    }
+
+    #extractSkillIdsAndLabels(data) {
+      const ids = []
+      const labels = new Map()
+
+      const addSkill = (value, label) => {
+        if (value === null || value === undefined) return
+        const id = String(value)
+        if (!id) return
+        ids.push(id)
+        if (label && !labels.has(id)) labels.set(id, String(label))
+      }
+
+      const visit = (value, fallbackId) => {
+        if (value === null || value === undefined) return
+
+        if (value instanceof Set) {
+          value.forEach((entry) => visit(entry))
+          return
+        }
+
+        if (value instanceof Map) {
+          for (const [mapKey, mapValue] of value.entries()) {
+            if (typeof mapValue === 'object' && mapValue !== null) {
+              const id = mapValue.id ?? mapValue.key ?? mapValue.skill ?? mapValue.slug ?? mapValue.value ?? mapKey
+              const label = mapValue.label ?? mapValue.name ?? mapValue.title ?? null
+              if (id !== undefined) addSkill(id, label)
+              visit(mapValue.skills ?? mapValue.skill ?? mapValue.values ?? mapValue.entries ?? mapValue.list ?? mapValue.items, null)
+            } else {
+              visit(mapValue, mapKey)
+            }
+          }
+          return
+        }
+
+        if (Array.isArray(value)) {
+          value.forEach((entry) => {
+            if (Array.isArray(entry)) {
+              visit(entry)
+            } else if (typeof entry === 'object' && entry !== null) {
+              const id = entry.id ?? entry.key ?? entry.skill ?? entry.slug ?? entry.value ?? entry.default ?? entry.primary ?? fallbackId
+              const label = entry.label ?? entry.name ?? entry.title ?? entry.displayName ?? null
+              if (id !== undefined) addSkill(id, label)
+              const nested = entry.skills ?? entry.skill ?? entry.values ?? entry.entries ?? entry.list ?? entry.items
+              if (nested) visit(nested)
+            } else {
+              visit(entry)
+            }
+          })
+          return
+        }
+
+        if (typeof value === 'object') {
+          const id = value.id ?? value.key ?? value.skill ?? value.slug ?? value.value ?? value.default ?? value.primary ?? fallbackId
+          const label = value.label ?? value.name ?? value.title ?? value.displayName ?? null
+          if (id !== undefined) addSkill(id, label)
+          const nestedKeys = ['skill', 'skills', 'ids', 'id', 'keys', 'key', 'values', 'value', 'default', 'primary', 'entries', 'list', 'items', 'options', 'choices']
+          for (const nestedKey of nestedKeys) {
+            if (value[nestedKey] !== undefined) visit(value[nestedKey])
+          }
+          return
+        }
+
+        if (typeof value === 'string' || typeof value === 'number') {
+          addSkill(value)
+        }
+      }
+
+      visit(data)
+
+      return { ids: this.#dedupeIds(ids), labels }
     }
 
     #normalizeSkillIds(skills) {
@@ -384,16 +539,47 @@ export function createActionHandlerClass(api) {
         if (skills.key) return this.#normalizeSkillIds(skills.key)
         if (skills.value) return this.#normalizeSkillIds(skills.value)
         if (skills.default) return this.#normalizeSkillIds(skills.default)
+        if (skills.skills) return this.#normalizeSkillIds(skills.skills)
+        if (skills.entries) return this.#normalizeSkillIds(skills.entries)
+        if (skills.list) return this.#normalizeSkillIds(skills.list)
+        if (skills.items) return this.#normalizeSkillIds(skills.items)
         return this.#dedupeIds(Object.values(skills).flatMap((entry) => this.#normalizeSkillIds(entry)))
       }
       return []
     }
 
     #dedupeIds(list) {
-      return [...new Set(list.filter((value) => typeof value === 'string' && value))]
+      return [...new Set(list
+        .map((value) => {
+          if (value === null || value === undefined) return ''
+          return String(value)
+        })
+        .filter((value) => value))]
     }
 
-    #getSkillCategoryLabel(categoryId) {
+    #getSkillCategoryLabel(categoryId, fallbackLabel) {
+      if (fallbackLabel) return fallbackLabel
+
+      const helper = game.l5r5e?.HelpersL5r5e
+      const helperMethods = ['getSkillCategoryLabel', 'getNpcSkillCategoryLabel']
+      for (const methodName of helperMethods) {
+        const method = helper?.[methodName]
+        if (typeof method !== 'function') continue
+        try {
+          const result = method.call(helper, categoryId, this.actor)
+          if (result) return result
+        } catch (error) {
+          continue
+        }
+      }
+
+      const config = CONFIG?.l5r5e ?? {}
+      const configCategory = config?.npc?.skills?.[categoryId] ?? config?.skills?.[categoryId]
+      if (configCategory) {
+        const configLabel = configCategory.label ?? configCategory.name ?? configCategory.title
+        if (configLabel) return configLabel
+      }
+
       const keys = [
         `l5r5e.npc.skills.${categoryId}.title`,
         `l5r5e.skills.${categoryId}.title`,
@@ -403,7 +589,39 @@ export function createActionHandlerClass(api) {
       return this.#localizeFirst(keys)
     }
 
-    #getSkillLabel(categoryId, skillId) {
+    #getSkillLabel(categoryId, skillId, fallbackLabel) {
+      if (fallbackLabel) return fallbackLabel
+
+      const helper = game.l5r5e?.HelpersL5r5e
+      const helperMethods = [
+        ['getNpcSkillLabel', [categoryId, skillId]],
+        ['getNpcSkillLabel', [skillId]],
+        ['getSkillLabel', [categoryId, skillId]],
+        ['getSkillLabel', [skillId]],
+        ['getSkillName', [skillId]],
+        ['getSkillNameFromId', [skillId]]
+      ]
+
+      for (const [methodName, args] of helperMethods) {
+        const method = helper?.[methodName]
+        if (typeof method !== 'function') continue
+        try {
+          const result = method.apply(helper, args)
+          if (result) return result
+        } catch (error) {
+          continue
+        }
+      }
+
+      const config = CONFIG?.l5r5e ?? {}
+      const configSkill = config?.npc?.skills?.[categoryId]?.[skillId]
+        ?? config?.skills?.[categoryId]?.[skillId]
+        ?? config?.skills?.[skillId]
+      if (configSkill) {
+        const configLabel = configSkill.label ?? configSkill.name ?? configSkill.title
+        if (configLabel) return configLabel
+      }
+
       const keys = [
         `l5r5e.npc.skills.${categoryId}.${skillId}`,
         `l5r5e.skills.${categoryId}.${skillId}`,
@@ -419,6 +637,10 @@ export function createActionHandlerClass(api) {
         this.actor?.system?.skills,
         this.actor?.system?.npcSkills,
         this.actor?.system?.npc?.skills,
+        this.actor?.system?.npc?.skillCategories,
+        this.actor?.system?.npc?.skill_categories,
+        this.actor?.system?.npc?.skillGroups,
+        this.actor?.system?.npc?.skill_groups,
         this.actor?.system?.skillRanks,
         this.actor?.system?.skillGroups,
         this.actor?.system?.skill_groups
@@ -437,6 +659,94 @@ export function createActionHandlerClass(api) {
       if (directValue !== null && directValue !== undefined) return directValue
 
       return ''
+    }
+
+    #resolveSkillSource(helpers, npc = false) {
+      const actor = this.actor
+      const methodNames = npc
+        ? [
+            'getNpcSkillCategoriesList',
+            'getNpcSkillCategories',
+            'getNpcSkillsCategoriesList',
+            'getNpcSkillsCategories',
+            'getNpcSkillsList',
+            'getNpcSkills',
+            'getNpcSkillGroupsList',
+            'getNpcSkillGroups'
+          ]
+        : [
+            'getCategoriesSkillsList',
+            'getSkillCategoriesList',
+            'getSkillsCategoriesList',
+            'getSkillsList',
+            'getSkillCategories'
+          ]
+
+      const dynamicMethods = Object.keys(helpers ?? {})
+        .filter((key) => {
+          const lowered = key.toLowerCase()
+          if (!lowered.includes('skill')) return false
+          if (npc && !lowered.includes('npc')) return false
+          if (!npc && lowered.includes('npc')) return false
+          return lowered.includes('list') || lowered.includes('categor') || lowered.includes('group')
+        })
+
+      const tried = new Set()
+      const tryMethods = [...methodNames, ...dynamicMethods]
+      for (const methodName of tryMethods) {
+        if (tried.has(methodName)) continue
+        tried.add(methodName)
+        const method = helpers?.[methodName]
+        const result = this.#invokeHelperMethod(method, helpers, actor)
+        if (result) return result
+      }
+
+      const fallbackPaths = npc
+        ? [
+            'system.npc.skills',
+            'system.npcSkills',
+            'system.skills',
+            'system.npc.skillCategories',
+            'system.npc.skill_categories',
+            'system.npc.skillGroups',
+            'system.npc.skill_groups'
+          ]
+        : [
+            'system.skills',
+            'system.skillCategories',
+            'system.skill_categories',
+            'system.skillGroups',
+            'system.skill_groups'
+          ]
+
+      for (const path of fallbackPaths) {
+        const value = this.#getProperty(actor, path)
+        if (value) return value
+      }
+
+      return npc
+        ? actor?.system?.npcSkills ?? actor?.system?.skills
+        : actor?.system?.skills
+    }
+
+    #invokeHelperMethod(method, context, actor) {
+      if (typeof method !== 'function') return null
+      const argSets = [
+        [actor],
+        [actor, { actor }],
+        []
+      ]
+
+      for (const args of argSets) {
+        try {
+          const result = method.apply(context, args)
+          if (result) return result
+        } catch (error) {
+          continue
+        }
+      }
+
+      return null
     }
 
     #resolveSkillValue(skill) {
