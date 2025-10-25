@@ -36,7 +36,20 @@ export function createActionHandlerClass(api) {
 
         const techniqueEntries = getTechniqueTypeEntries()
         this.techniqueGroups = this.#createEntryMap(techniqueEntries)
-        this.techniqueTypeKeys = new Set(techniqueEntries.flatMap((entry) => [entry.actorKey ?? entry.id, entry.id]))
+        const techniqueTypeKeys = new Set()
+        for (const entry of techniqueEntries) {
+          const keys = [entry.actorKey ?? entry.id, entry.id]
+            .filter((key) => typeof key === 'string' && key.length > 0)
+          for (const key of keys) {
+            techniqueTypeKeys.add(key)
+            const sanitizedKey = sanitizeId(key)
+            if (sanitizedKey) {
+              techniqueTypeKeys.add(sanitizedKey)
+              techniqueTypeKeys.add(sanitizedKey.replace(/-/g, '_'))
+            }
+          }
+        }
+        this.techniqueTypeKeys = techniqueTypeKeys
       }
 
       if (this.actorType === 'character' || this.actorType === 'npc') {
@@ -810,11 +823,11 @@ export function createActionHandlerClass(api) {
         const isTechnique = this.#isTechnique(value)
 
         if (isTechnique) {
-          const technique_type = sanitizeId(value.system.technique_type)
-          if (!technique_type) continue
+          const techniqueType = this.#getTechniqueType(value)
+          if (!techniqueType) continue
 
-          if (!techniqueMap.has(technique_type)) techniqueMap.set(technique_type, new Map())
-          techniqueMap.get(technique_type).set(key, value)
+          if (!techniqueMap.has(techniqueType)) techniqueMap.set(techniqueType, new Map())
+          techniqueMap.get(techniqueType).set(key, value)
         }
       }
 
@@ -887,16 +900,172 @@ export function createActionHandlerClass(api) {
      * @returns {boolean}
      */
     #isTechnique(item) {
-      const type = item.type
+      if (item?.type !== 'technique') return false
 
-      if (type !== 'technique') return false
+      const techniqueType = this.#getTechniqueType(item)
 
-      if (!this.techniqueTypeKeys || this.techniqueTypeKeys.size === 0) return true
+      if (!techniqueType) {
+        return !this.techniqueTypeKeys || this.techniqueTypeKeys.size === 0
+      }
 
-      const techniqueType = item.system.technique_type
-      if (!techniqueType) return false
+      if (!this.techniqueTypeKeys || this.techniqueTypeKeys.size === 0) {
+        return true
+      }
 
-      return this.techniqueTypeKeys.has(techniqueType) || this.techniqueTypeKeys.has(sanitizeId(techniqueType))
+      if (this.#hasTechniqueTypeKey(techniqueType)) {
+        return true
+      }
+
+      this.#registerTechniqueTypeKey(techniqueType)
+
+      return true
+    }
+
+    #hasTechniqueTypeKey(type) {
+      if (!this.techniqueTypeKeys) return false
+
+      const candidates = this.#createTechniqueTypeKeyVariants(type)
+
+      return candidates.some((candidate) => this.techniqueTypeKeys.has(candidate))
+    }
+
+    #registerTechniqueTypeKey(type) {
+      if (!this.techniqueTypeKeys) return
+
+      const candidates = this.#createTechniqueTypeKeyVariants(type)
+
+      for (const candidate of candidates) {
+        this.techniqueTypeKeys.add(candidate)
+      }
+    }
+
+    #createTechniqueTypeKeyVariants(type) {
+      const values = []
+      if (typeof type === 'string' && type.length > 0) {
+        values.push(type)
+      } else if (typeof type === 'number') {
+        values.push(String(type))
+      }
+
+      const sanitized = sanitizeId(type)
+      if (sanitized) {
+        values.push(sanitized)
+        values.push(sanitized.replace(/-/g, '_'))
+      }
+
+      return [...new Set(values.filter((value) => typeof value === 'string' && value.length > 0))]
+    }
+
+    #getTechniqueType(item) {
+      if (!item) return ''
+
+      const system = item.system ?? {}
+      const candidatePaths = [
+        'technique_type',
+        'techniqueType',
+        'technique.technique_type',
+        'technique.techniqueType',
+        'technique.type',
+        'technique.category',
+        'details.technique_type',
+        'details.techniqueType',
+        'details.type',
+        'details.category',
+        'summary.technique_type',
+        'summary.techniqueType',
+        'summary.type',
+        'summary.category',
+        'category',
+        'subtype',
+        'classification',
+        'group'
+      ]
+
+      for (const path of candidatePaths) {
+        const value = foundry.utils.getProperty(system, path)
+        const resolved = this.#extractTechniqueTypeValue(value)
+        if (resolved) return resolved
+      }
+
+      const fallbackCandidates = [
+        system.type,
+        system.details?.type,
+        system.summary?.type
+      ]
+
+      for (const candidate of fallbackCandidates) {
+        const resolved = this.#extractTechniqueTypeValue(candidate, { allowGeneric: true })
+        if (resolved) return resolved
+      }
+
+      return ''
+    }
+
+    #extractTechniqueTypeValue(value, { allowGeneric = false, depth = 0 } = {}) {
+      if (value === null || value === undefined) return ''
+      if (depth > 5) return ''
+
+      if (typeof value === 'string' || typeof value === 'number') {
+        const sanitized = sanitizeId(value)
+        if (!sanitized) return ''
+        if (!allowGeneric && ['technique', 'techniques', 'item', 'items', 'ability'].includes(sanitized)) return ''
+        return sanitized
+      }
+
+      if (value instanceof Set) {
+        for (const entry of value) {
+          const resolved = this.#extractTechniqueTypeValue(entry, { allowGeneric, depth: depth + 1 })
+          if (resolved) return resolved
+        }
+        return ''
+      }
+
+      if (value instanceof Map) {
+        for (const entry of value.values()) {
+          const resolved = this.#extractTechniqueTypeValue(entry, { allowGeneric, depth: depth + 1 })
+          if (resolved) return resolved
+        }
+        return ''
+      }
+
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          const resolved = this.#extractTechniqueTypeValue(entry, { allowGeneric, depth: depth + 1 })
+          if (resolved) return resolved
+        }
+        return ''
+      }
+
+      if (typeof value === 'object') {
+        const priorityKeys = [
+          'technique_type',
+          'techniqueType',
+          'type',
+          'category',
+          'id',
+          'key',
+          'value',
+          'default',
+          'defaultType',
+          'defaultCategory',
+          'slug',
+          'name',
+          'label'
+        ]
+
+        for (const key of priorityKeys) {
+          if (!(key in value)) continue
+          const resolved = this.#extractTechniqueTypeValue(value[key], { allowGeneric, depth: depth + 1 })
+          if (resolved) return resolved
+        }
+
+        for (const entry of Object.values(value)) {
+          const resolved = this.#extractTechniqueTypeValue(entry, { allowGeneric, depth: depth + 1 })
+          if (resolved) return resolved
+        }
+      }
+
+      return ''
     }
 
     #buildDerivedAttributes() {
