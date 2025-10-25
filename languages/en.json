@@ -1,6 +1,9 @@
 {
   "tokenActionHud": {
     "l5r5e": {
+      "messages": {
+        "itemChatFallback": "Unable to send {item} to chat."
+      },
       "settings": {
         "displayUnequipped": {
           "name": "Display Unequipped",
