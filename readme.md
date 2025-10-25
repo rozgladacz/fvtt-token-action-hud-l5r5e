@@ -24,14 +24,14 @@ Przed instalacją upewnij się, że korzystasz z Foundry VTT w wersji 13 lub wy�
 ## Method 1
 1. On Foundry VTT's **Configuration and Setup** screen, go to **Add-on Modules**
 2. Click **Install Module**
-3. Search for **Token Action HUD L5r5e** 
+3. Search for **Token Action HUD L5r5e**
 4. Click **Install** next to the module listing
 5. Install or update the required modules (Token Action HUD Core ≥2.0.12, socketlib) if prompted
 
 ## Method 2
 1. On Foundry VTT's **Configuration and Setup** screen, go to **Add-on Modules**
 2. Click **Install Module**
-3. In the Manifest URL field, paste: `https://github.com/DonHuberto/fvtt-token-action-hud-l5r5e/releases/latest/download/module.json`
+3. In the Manifest URL field, paste: `https://github.com/DonHuberto/fvtt-token-action-hud-l5r5e/releases/download/v1.3.0/module.json`
 4. Click **Install** next to the pasted Manifest URL
 5. Install or update the required modules (Token Action HUD Core ≥2.0.12, socketlib) if prompted
 
@@ -55,6 +55,11 @@ Pull requests are welcome. Please include a reason for the request or create an 
 Thank you to the Community Helpers on Foundry's Discord who provide tireless support for people seeking help with the HUD.
 
 # Release Notes
+
+## 1.3.0
+
+- Aktualizacja manifestu i instrukcji instalacji do wydania v1.3.0
+- Potwierdzono kompatybilność z Foundry VTT v13
 
 ## 1.2.0
 
