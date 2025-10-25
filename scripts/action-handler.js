@@ -79,6 +79,107 @@ export function createActionHandlerClass(api) {
      * @returns {object}
      */
     #buildMultipleTokenActions() {
+      const tokens = this.tokens ?? []
+      if (tokens.length === 0) return
+
+      const actors = this.actors ?? []
+
+      // Utility actions available for all controlled tokens
+      const utilityActions = []
+
+      const endTurnLabel = api.Utils.i18n?.('tokenActionHud.utility.endTurn')
+        ?? game.i18n.localize?.('tokenActionHud.utility.endTurn')
+        ?? 'End Turn'
+
+      utilityActions.push({
+        id: 'endTurn',
+        name: endTurnLabel,
+        encodedValue: ['utility', 'endTurn'].join(this.delimiter),
+        listName: `${api.Utils.i18n('tokenActionHud.utility') ?? 'Utility'}: ${endTurnLabel}`
+      })
+
+      if (utilityActions.length > 0) {
+        const groupData = {
+          id: 'utility',
+          name: api.Utils.i18n('tokenActionHud.utility') ?? 'Utility',
+          type: 'system'
+        }
+
+        this.addActions(utilityActions, groupData)
+      }
+
+      if (actors.length === 0) return
+
+      const primaryActor = actors.find((actor) => !!actor)
+      if (!primaryActor) return
+
+      const rings = game.l5r5e?.HelpersL5r5e?.getRingsList(primaryActor) ?? []
+      if (rings.length === 0) return
+
+      const stanceSet = new Set(actors
+        .map((actor) => actor?.system?.stance)
+        .filter((stance) => typeof stance === 'string'))
+
+      const ringActions = rings
+        .map((ring) => {
+          try {
+            const id = ring.id
+            const encodedValue = ['ring', id].join(this.delimiter)
+            const ringLabel = api.Utils.i18n(`l5r5e.rings.${id}`) ?? ring.label ?? id
+
+            const actorValues = actors
+              .map((actor) => actor?.system?.rings?.[id]?.value)
+              .filter((value) => value !== undefined && value !== null)
+
+            let name = ringLabel
+            if (actorValues.length === actors.length && actorValues.length > 0) {
+              const uniqueValues = [...new Set(actorValues)]
+              if (uniqueValues.length === 1) {
+                name = `${ringLabel}: ${uniqueValues[0]}`
+              } else {
+                name = `${ringLabel}: ${uniqueValues.join('/')}`
+              }
+            } else if (ring?.value !== undefined) {
+              name = `${ringLabel}: ${ring.value}`
+            }
+
+            let cssClass = ''
+            if (stanceSet.size === 1 && stanceSet.has(id)) {
+              cssClass = 'toggle active'
+            }
+
+            const tooltip = api.Utils.i18n(`l5r5e.conflict.stances.${id}tip`) ?? ''
+
+            const img = api.Utils.getImage(`systems/l5r5e/assets/icons/rings/${id}.svg`)
+
+            const valuesLabel = actorValues.length ? actorValues.join('/') : ''
+            const listName = valuesLabel ? `${ringLabel}: ${valuesLabel}` : ringLabel
+
+            return {
+              id,
+              name,
+              img,
+              encodedValue,
+              cssClass,
+              tooltip,
+              listName
+            }
+          } catch (error) {
+            api.Logger?.error?.(error)
+            return null
+          }
+        })
+        .filter((ring) => !!ring)
+
+      if (ringActions.length === 0) return
+
+      const ringGroupData = {
+        id: 'rings',
+        name: `${api.Utils.i18n('l5r5e.rings.title')}` ?? 'rings',
+        type: 'system'
+      }
+
+      this.addActions(ringActions, ringGroupData)
     }
 
     /**
