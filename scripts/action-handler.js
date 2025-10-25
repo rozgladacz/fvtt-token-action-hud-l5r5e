@@ -720,7 +720,7 @@ export function createActionHandlerClass(api) {
           ]
 
       for (const path of fallbackPaths) {
-        const value = this.#getProperty(actor, path)
+        const value = foundry.utils.getProperty(actor, path)
         if (value) return value
       }
 
@@ -940,7 +940,7 @@ export function createActionHandlerClass(api) {
 
       for (const currentSection of sections) {
         for (const path of candidatePaths) {
-          const value = this.#getProperty(currentSection, path)
+          const value = foundry.utils.getProperty(currentSection, path)
           if (value !== undefined) return value
         }
       }
@@ -958,7 +958,7 @@ export function createActionHandlerClass(api) {
         : ['derived', 'derivedAttributes', 'attributes.derived', 'attributes.derivedAttributes']
 
       for (const path of paths) {
-        const value = this.#getProperty(system, path)
+        const value = foundry.utils.getProperty(system, path)
         if (value && typeof value === 'object' && !sections.includes(value)) {
           sections.push(value)
         }
@@ -1074,19 +1074,6 @@ export function createActionHandlerClass(api) {
       return values.find((value) => value !== undefined && value !== null)
     }
 
-    #getProperty(object, path) {
-      if (!object || !path) return undefined
-      if (Object.hasOwn(object, path)) return object[path]
-
-      const keys = String(path).split('.')
-      let result = object
-      for (const key of keys) {
-        if (result === null || result === undefined) return undefined
-        result = result[key]
-      }
-      return result
-    }
-
     #createEntryMap(entries) {
       return new Map(entries.map((entry) => [entry.id, entry]))
     }
@@ -1129,7 +1116,8 @@ export function createActionHandlerClass(api) {
      * @returns {object}
      */
     async #getAction(actionType, entity) {
-      const id = entity.id ?? entity._id
+      const fallbackId = sanitizeId(entity.name ?? '') || foundry.utils.randomID()
+      const id = String(entity.id ?? entity.uuid ?? fallbackId)
       let name = entity?.name ?? entity?.label
 
       const actionTypeName = `${api.Utils.i18n(ACTION_TYPE[actionType])}: ` ?? ''
