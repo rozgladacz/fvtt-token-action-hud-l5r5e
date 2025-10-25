@@ -94,44 +94,69 @@ export const SKILL_TYPE = {
  * Item Qualities
  */
 export const ITEM_QUALITIES = {
-  razor_edged: 'Razor-Edged',
-  ceremonial: 'Ceremonial',
-  damaged: 'Damaged',
-  destroyed: 'Destroyed',
-  concealable: 'Concealable',
-  cumbersome: 'Cumbersome',
-  snaring: 'Snaring',
-  unholy: 'Unholy',
-  forbidden: 'Forbidden',
-  resplendent: 'Resplendent',
-  wargear: 'Wargear',
-  mundane: 'Mundane',
-  prepare: 'Prepare',
-  sacred: 'Sacred',
-  durable: 'Durable',
-  subtle: 'Subtle',
-  kenzo_blade: 'Kenzō Blade'
+  razor_edged: 'tokenActionHud.l5r5e.qualities.razorEdged',
+  ceremonial: 'tokenActionHud.l5r5e.qualities.ceremonial',
+  damaged: 'tokenActionHud.l5r5e.qualities.damaged',
+  destroyed: 'tokenActionHud.l5r5e.qualities.destroyed',
+  concealable: 'tokenActionHud.l5r5e.qualities.concealable',
+  cumbersome: 'tokenActionHud.l5r5e.qualities.cumbersome',
+  snaring: 'tokenActionHud.l5r5e.qualities.snaring',
+  unholy: 'tokenActionHud.l5r5e.qualities.unholy',
+  forbidden: 'tokenActionHud.l5r5e.qualities.forbidden',
+  resplendent: 'tokenActionHud.l5r5e.qualities.resplendent',
+  wargear: 'tokenActionHud.l5r5e.qualities.wargear',
+  mundane: 'tokenActionHud.l5r5e.qualities.mundane',
+  prepare: 'tokenActionHud.l5r5e.qualities.prepare',
+  sacred: 'tokenActionHud.l5r5e.qualities.sacred',
+  durable: 'tokenActionHud.l5r5e.qualities.durable',
+  subtle: 'tokenActionHud.l5r5e.qualities.subtle',
+  kenzo_blade: 'tokenActionHud.l5r5e.qualities.kenzoBlade'
 }
 
 /**
  * Item Patterns
  */
 export const ITEM_PATTERN = {
-  jade_inlay: 'Shirogane Jade Inlay',
-  uchema: 'Uchema’s Technique',
-  yasunori: 'Yasunori Steel',
-  akodo: 'Akodo Pattern',
-  burning_water: 'Burning Watter Pattern',
-  concealment: 'Concealment Pattern',
-  deadly_fangs: 'Deadly Fangs Pattern',
-  fearsome_snarl: 'Fearsome Snarl Pattern',
-  ichiro: 'Ichirō Pattern',
-  mountain_silk: 'Mountain Silk Pattern',
-  screaming_fire: 'Screaming Fire Pattern',
-  toriyama: 'Toriyama Endurance Pattern',
-  qamarist: 'Spirit of the Qamarist Pattern',
-  yodhaniya: 'Ghostlands Yodhaniya Pattern',
-  kokejin: 'Kökejin’s Heart of the Wind Pattern',
-  agasha: 'Agasha Pattern'
+  jade_inlay: 'tokenActionHud.l5r5e.patterns.jadeInlay',
+  uchema: 'tokenActionHud.l5r5e.patterns.uchema',
+  yasunori: 'tokenActionHud.l5r5e.patterns.yasunori',
+  akodo: 'tokenActionHud.l5r5e.patterns.akodo',
+  burning_water: 'tokenActionHud.l5r5e.patterns.burningWater',
+  concealment: 'tokenActionHud.l5r5e.patterns.concealment',
+  deadly_fangs: 'tokenActionHud.l5r5e.patterns.deadlyFangs',
+  fearsome_snarl: 'tokenActionHud.l5r5e.patterns.fearsomeSnarl',
+  ichiro: 'tokenActionHud.l5r5e.patterns.ichiro',
+  mountain_silk: 'tokenActionHud.l5r5e.patterns.mountainSilk',
+  screaming_fire: 'tokenActionHud.l5r5e.patterns.screamingFire',
+  toriyama: 'tokenActionHud.l5r5e.patterns.toriyama',
+  qamarist: 'tokenActionHud.l5r5e.patterns.qamarist',
+  yodhaniya: 'tokenActionHud.l5r5e.patterns.yodhaniya',
+  kokejin: 'tokenActionHud.l5r5e.patterns.kokejin',
+  agasha: 'tokenActionHud.l5r5e.patterns.agasha'
+}
 
+/**
+ * Item tags
+ */
+export const ITEM_TAGS = {
+  default: { icon: 'fa-solid fa-tag', class: 'tah-tag-secondary' },
+  pattern: { icon: 'fa-solid fa-swatchbook', class: 'tah-tag-tertiary' },
+  bonus: { icon: 'fa-solid fa-arrow-up-right-dots', class: 'tah-tag-alt' },
+  clan: { label: 'tokenActionHud.l5r5e.tags.clan', icon: 'fa-solid fa-flag', class: 'tah-tag-secondary' },
+  culture: { label: 'tokenActionHud.l5r5e.tags.culture', icon: 'fa-solid fa-earth-asia', class: 'tah-tag-secondary' },
+  material: { label: 'tokenActionHud.l5r5e.tags.material', icon: 'fa-solid fa-gem', class: 'tah-tag-secondary' },
+  tradition: { label: 'tokenActionHud.l5r5e.tags.tradition', icon: 'fa-solid fa-scroll', class: 'tah-tag-secondary' }
+}
+
+/**
+ * Item bonus descriptors
+ */
+export const ITEM_BONUS = {
+  armorTN: { label: 'tokenActionHud.l5r5e.bonuses.armorTN', icon: 'fa-solid fa-shield-halved', class: 'tah-tag-alt' },
+  resistance: { label: 'tokenActionHud.l5r5e.bonuses.resistance', icon: 'fa-solid fa-shield', class: 'tah-tag-alt' },
+  fatigue: { label: 'tokenActionHud.l5r5e.bonuses.fatigue', icon: 'fa-solid fa-heart-pulse', class: 'tah-tag-alt' },
+  strife: { label: 'tokenActionHud.l5r5e.bonuses.strife', icon: 'fa-solid fa-fire', class: 'tah-tag-alt' },
+  deadliness: { label: 'tokenActionHud.l5r5e.bonuses.deadliness', icon: 'fa-solid fa-skull', class: 'tah-tag-alt' },
+  damage: { label: 'tokenActionHud.l5r5e.bonuses.damage', icon: 'fa-solid fa-burst', class: 'tah-tag-alt' },
+  opportunities: { label: 'tokenActionHud.l5r5e.bonuses.opportunities', icon: 'fa-solid fa-dice-d20', class: 'tah-tag-alt' }
 }

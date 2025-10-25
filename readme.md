@@ -1,4 +1,4 @@
-![Downloads](https://img.shields.io/github/downloads/EduardoBugs/fvtt-token-action-hud-l5r5e/latest/module.zip?color=2b82fc&label=DOWNLOADS&style=for-the-badge) [![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2Ftoken-action-hud-l5r5e&colorB=448d34&style=for-the-badge)](https://forge-vtt.com/bazaar#package=token-action-hud-l5r5e)
+![Downloads](https://img.shields.io/github/downloads/DonHuberto/fvtt-token-action-hud-l5r5e/latest/module.zip?color=2b82fc&label=DOWNLOADS&style=for-the-badge) [![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2Ftoken-action-hud-l5r5e&colorB=448d34&style=for-the-badge)](https://forge-vtt.com/bazaar#package=token-action-hud-l5r5e)
 
 # Token Action HUD L5r5e
 
@@ -31,7 +31,7 @@ Przed instalacją upewnij się, że korzystasz z Foundry VTT w wersji 13 lub wy�
 ## Method 2
 1. On Foundry VTT's **Configuration and Setup** screen, go to **Add-on Modules**
 2. Click **Install Module**
-3. In the Manifest URL field, paste: `https://github.com/EduardoBugs/fvtt-token-action-hud-l5r5e/releases/latest/download/module.json`
+3. In the Manifest URL field, paste: `https://github.com/DonHuberto/fvtt-token-action-hud-l5r5e/releases/latest/download/module.json`
 4. Click **Install** next to the pasted Manifest URL
 5. Install or update the required modules (Token Action HUD Core ≥2.0.12, socketlib) if prompted
 
@@ -46,7 +46,7 @@ Token Action HUD uses the [Color Picker](https://foundryvtt.com/packages/color-p
 
 For a guide on using Token Action HUD, go to: [How to Use Token Action HUD](https://github.com/Larkinabout/fvtt-token-action-hud-core/wiki/How-to-Use-Token-Action-HUD)
 
-For questions, feature requests or bug reports, please open an issue [here](https://github.com/EduardoBugs/fvtt-token-action-hud-l5r5e/issues).
+For questions, feature requests or bug reports, please open an issue [here](https://github.com/DonHuberto/fvtt-token-action-hud-l5r5e/issues).
 
 Pull requests are welcome. Please include a reason for the request or create an issue before starting one.
 
@@ -55,6 +55,11 @@ Pull requests are welcome. Please include a reason for the request or create an 
 Thank you to the Community Helpers on Foundry's Discord who provide tireless support for people seeking help with the HUD.
 
 # Release Notes
+
+## 1.2.0
+
+- Aktualizacja manifestu i instrukcji instalacji pod repozytorium DonHuberto
+- Wymagane Foundry VTT v13
 
 ## 1.1.0
 
