@@ -113,7 +113,7 @@ export function getActorSection(actor, paths = []) {
   if (!actor) return null
   const system = actor.system ?? {}
   for (const path of paths) {
-    const value = getProperty(system, path)
+    const value = foundry.utils.getProperty(system, path)
     if (value) return value
   }
   return null
@@ -160,7 +160,7 @@ function getEntriesFromConfig(paths, translationPrefix, stringIsTranslation) {
   if (!config) return []
 
   for (const path of paths) {
-    const value = getProperty(config, path)
+    const value = foundry.utils.getProperty(config, path)
     const entries = normalizeEntries(value, { translationPrefix, stringIsTranslation })
     if (entries.length > 0) return entries
   }
@@ -252,16 +252,5 @@ function dedupeEntries(entries) {
     }
   }
   return [...map.values()]
-}
-
-function getProperty(object, path) {
-  if (!object || !path) return undefined
-  const keys = path.split('.')
-  let result = object
-  for (const key of keys) {
-    if (result === null || result === undefined) return undefined
-    result = result[key]
-  }
-  return result
 }
 
