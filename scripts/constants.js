@@ -76,6 +76,7 @@ export const GROUP = {
 export const ITEM_TYPE = {
   armor: { groupId: 'armor' },
   equipment: { groupId: 'equipment' },
+  item: { groupId: 'equipment' },
   weapon: { groupId: 'weapons' }
 }
 

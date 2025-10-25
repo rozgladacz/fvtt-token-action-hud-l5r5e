@@ -244,42 +244,44 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleWeaponAction(_event, actor, token, actionId) {
-      const weapon = actor.items.get(actionId)
+    async #handleWeaponAction(event, actor, token, actionId) {
+      const weapon = actor?.items?.get(actionId)
+        ?? actor?.items?.find?.((item) => item?.uuid === actionId)
       if (!weapon) return
 
       const skillIds = this.#extractSkillIds(weapon?.system?.skill)
       const ringId = this.#extractRingId(weapon?.system?.ring)
+      const difficulty = weapon?.system?.tn ?? weapon?.system?.difficulty ?? null
 
-      const options = {
+      const baseOptions = {
+        event,
         item: weapon,
         itemId: weapon.id,
         sourceId: weapon.id,
         type: weapon.type,
         itemType: weapon.type,
         title: weapon.name,
-        difficulty: weapon?.system?.tn ?? weapon?.system?.difficulty ?? null,
+        difficulty,
         context: 'token-action-hud'
       }
 
-      if (options.difficulty !== null && options.difficulty !== undefined) {
-        options.tn = options.tn ?? options.difficulty
-        options.targetNumber = options.targetNumber ?? options.difficulty
-      }
-
       if (skillIds.length > 0) {
-        options.skill = skillIds[0]
-        options.skillId = skillIds[0]
-        options.skills = skillIds
-        options.skillsList = skillIds
+        baseOptions.skill = baseOptions.skill ?? skillIds[0]
+        baseOptions.skillId = baseOptions.skillId ?? skillIds[0]
+        baseOptions.skills = baseOptions.skills ?? skillIds
+        baseOptions.skillsList = baseOptions.skillsList ?? skillIds
       }
 
       if (ringId) {
-        options.ring = ringId
-        options.ringId = ringId
+        baseOptions.ring = baseOptions.ring ?? ringId
+        baseOptions.ringId = baseOptions.ringId ?? ringId
       }
 
-      this.#openDicePicker(actor, options, token)
+      const options = this.#prepareRollOptions(actor, token, baseOptions)
+
+      if (await this.#tryItemRoll(actor, weapon, options)) return
+
+      await this.#openDicePicker(actor, options, token, { prepared: true })
     }
 
     /**
@@ -289,14 +291,19 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleRingAction(_event, actor, token, actionId) {
-      const options = {
+    async #handleRingAction(event, actor, token, actionId) {
+      const baseOptions = {
+        event,
         ring: actionId,
         ringId: actionId,
         context: 'token-action-hud'
       }
 
-      this.#openDicePicker(actor, options, token)
+      const options = this.#prepareRollOptions(actor, token, baseOptions)
+
+      if (await this.#tryRingRoll(actor, actionId, options)) return
+
+      await this.#openDicePicker(actor, options, token, { prepared: true })
     }
 
     /**
@@ -306,14 +313,19 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleSkillAction(_event, actor, token, actionId) {
-      const options = {
+    async #handleSkillAction(event, actor, token, actionId) {
+      const baseOptions = {
+        event,
         skill: actionId,
         skillId: actionId,
         context: 'token-action-hud'
       }
 
-      this.#openDicePicker(actor, options, token)
+      const options = this.#prepareRollOptions(actor, token, baseOptions)
+
+      if (await this.#trySkillRoll(actor, actionId, options)) return
+
+      await this.#openDicePicker(actor, options, token, { prepared: true })
     }
 
     /**
@@ -323,18 +335,17 @@ export function createRollHandlerClass(api) {
      * @param {object} actor    The actor
      * @param {string} actionId The action id
      */
-    #handleTechniqueAction(_event, actor, token, actionId) {
-      const technique = actor.items.get(actionId)
-
-      if (!technique || technique.type !== "technique" || !technique.system.skill) {
-        return;
-      }
+    async #handleTechniqueAction(event, actor, token, actionId) {
+      const technique = actor?.items?.get(actionId)
+        ?? actor?.items?.find?.((item) => item?.uuid === actionId)
+      if (!technique) return
 
       const skillIds = this.#extractSkillIds(technique?.system?.skill)
       const ringId = this.#extractRingId(technique?.system?.ring)
       const difficulty = technique?.system?.difficulty ?? technique?.system?.tn ?? null
 
-      const options = {
+      const baseOptions = {
+        event,
         item: technique,
         itemId: technique.id,
         sourceId: technique.id,
@@ -345,109 +356,39 @@ export function createRollHandlerClass(api) {
         context: 'token-action-hud'
       }
 
-      if (difficulty !== null && difficulty !== undefined) {
-        options.tn = options.tn ?? difficulty
-        options.targetNumber = options.targetNumber ?? difficulty
-      }
-
       if (skillIds.length > 0) {
-        options.skill = skillIds[0]
-        options.skillId = skillIds[0]
-        options.skills = skillIds
-        options.skillsList = skillIds
+        baseOptions.skill = baseOptions.skill ?? skillIds[0]
+        baseOptions.skillId = baseOptions.skillId ?? skillIds[0]
+        baseOptions.skills = baseOptions.skills ?? skillIds
+        baseOptions.skillsList = baseOptions.skillsList ?? skillIds
       }
 
       if (ringId) {
-        options.ring = ringId
-        options.ringId = ringId
+        baseOptions.ring = baseOptions.ring ?? ringId
+        baseOptions.ringId = baseOptions.ringId ?? ringId
       }
 
-      this.#openDicePicker(actor, options, token)
+      const options = this.#prepareRollOptions(actor, token, baseOptions)
+
+      if (await this.#tryItemRoll(actor, technique, options)) return
+
+      await this.#openDicePicker(actor, options, token, { prepared: true })
     }
 
-    #openDicePicker(actor, payload = {}, token) {
-      const Dialog = game?.l5r5e?.DicePickerDialog
-      if (!Dialog) return
-
-      const options = { ...payload }
-
-      if (actor && !options.actor) options.actor = actor
-      if (actor?.id && !options.actorId) options.actorId = actor.id
-      if (actor?.uuid && !options.actorUuid) options.actorUuid = actor.uuid
-      if (actor?.type && !options.actorType) options.actorType = actor.type
-
-      if (token && !options.token) options.token = token
-      const tokenDocument = token?.document ?? token
-      if (tokenDocument?.id && !options.tokenId) options.tokenId = tokenDocument.id
-      if (tokenDocument?.uuid && !options.tokenUuid) options.tokenUuid = tokenDocument.uuid
-      if (tokenDocument?.scene?.id && !options.sceneId) options.sceneId = tokenDocument.scene.id
-      if (tokenDocument?.scene?.uuid && !options.sceneUuid) options.sceneUuid = tokenDocument.scene.uuid
-
-      if (options.item && !options.itemId) options.itemId = options.item.id
-      if (options.item && !options.sourceId) options.sourceId = options.sourceId ?? options.item.id
-      if (options.item && !options.itemType) options.itemType = options.item.type
-      if (options.item?.uuid && !options.itemUuid) options.itemUuid = options.item.uuid
-      if (options.item && !options.title) options.title = options.item.name
-
-      const normalizedSkills = this.#dedupeList([
-        options.skill,
-        options.skillId,
-        ...(Array.isArray(options.skills) ? options.skills : []),
-        ...(Array.isArray(options.skillsList) ? options.skillsList : [])
-      ])
-
-      if (normalizedSkills.length > 0) {
-        options.skill = normalizedSkills[0]
-        options.skillId = normalizedSkills[0]
-        options.skills = normalizedSkills
-        options.skillsList = normalizedSkills
+    async #openDicePicker(actor, payload = {}, token, { prepared = false } = {}) {
+      const options = prepared ? this.#duplicateOptions(payload) : this.#prepareRollOptions(actor, token, payload)
+      const Dialog = this.#resolveDiceDialog()
+      if (!Dialog) {
+        const localizedPrimary = game.i18n?.localize?.('tokenActionHud.l5r5e.dicePickerError')
+        const localizedSecondary = game.i18n?.localize?.('tokenActionHud.notifications.dicePickerError')
+        const errorMessage = (localizedPrimary && localizedPrimary !== 'tokenActionHud.l5r5e.dicePickerError')
+          ? localizedPrimary
+          : (localizedSecondary && localizedSecondary !== 'tokenActionHud.notifications.dicePickerError')
+            ? localizedSecondary
+            : 'Token Action HUD L5R5e: Unable to open Dice Picker Dialog'
+        ui.notifications?.warn?.(errorMessage)
+        return null
       }
-
-      const ring = this.#extractRingId(options.ring ?? options.ringId ?? options.ringKey)
-      if (ring) {
-        options.ring = ring
-        options.ringId = ring
-        options.ringKey = ring
-      }
-
-      if (!options.context) options.context = 'token-action-hud'
-
-      if (options.difficulty !== null && options.difficulty !== undefined) {
-        options.tn = options.tn ?? options.difficulty
-        options.targetNumber = options.targetNumber ?? options.difficulty
-      }
-      if (options.tn !== null && options.tn !== undefined) {
-        options.difficulty = options.difficulty ?? options.tn
-        options.targetNumber = options.targetNumber ?? options.tn
-      }
-      if (options.targetNumber !== null && options.targetNumber !== undefined) {
-        options.difficulty = options.difficulty ?? options.targetNumber
-        options.tn = options.tn ?? options.targetNumber
-      }
-
-      const skill = normalizedSkills[0]
-      const targetNumber = options.targetNumber ?? options.tn ?? options.difficulty ?? null
-      const diceContext = {}
-      if (skill) {
-        diceContext.skill = skill
-        diceContext.skillId = skill
-        diceContext.skillKey = skill
-      }
-      if (ring) {
-        diceContext.ring = ring
-        diceContext.ringId = ring
-        diceContext.ringKey = ring
-      }
-      if (targetNumber !== null && targetNumber !== undefined) {
-        diceContext.tn = targetNumber
-        diceContext.difficulty = targetNumber
-        diceContext.targetNumber = targetNumber
-      }
-
-      options.action = options.action ? { ...diceContext, ...options.action } : { ...diceContext }
-      options.check = options.check ? { ...diceContext, ...options.check } : { ...diceContext }
-      options.dicePool = options.dicePool ? { ...diceContext, ...options.dicePool } : { ...diceContext }
-      options.pool = options.pool ? { ...diceContext, ...options.pool } : { ...diceContext }
 
       const staticMethods = [
         ['show', [[options], [actor, options], [options, actor]]],
@@ -508,6 +449,404 @@ export function createRollHandlerClass(api) {
           ? localizedSecondary
           : 'Token Action HUD L5R5e: Unable to open Dice Picker Dialog'
       ui.notifications?.warn?.(errorMessage)
+      return null
+    }
+
+    #prepareRollOptions(actor, token, payload = {}) {
+      const options = this.#duplicateOptions(payload)
+
+      if (!options.context) options.context = 'token-action-hud'
+
+      if (actor && !options.actor) options.actor = actor
+      if (actor?.id && !options.actorId) options.actorId = actor.id
+      if (actor?.uuid && !options.actorUuid) options.actorUuid = actor.uuid
+      if (actor?.type && !options.actorType) options.actorType = actor.type
+
+      if (token && !options.token) options.token = token
+      const tokenDocument = token?.document ?? token
+      if (tokenDocument?.id && !options.tokenId) options.tokenId = tokenDocument.id
+      if (tokenDocument?.uuid && !options.tokenUuid) options.tokenUuid = tokenDocument.uuid
+      if (tokenDocument?.scene?.id && !options.sceneId) options.sceneId = tokenDocument.scene.id
+      if (tokenDocument?.scene?.uuid && !options.sceneUuid) options.sceneUuid = tokenDocument.scene.uuid
+
+      if (options.item && !options.itemId) options.itemId = options.item.id
+      if (options.item && !options.sourceId) options.sourceId = options.sourceId ?? options.item.id
+      if (options.item && !options.itemType) options.itemType = options.item.type
+      if (options.item?.uuid && !options.itemUuid) options.itemUuid = options.item.uuid
+      if (options.item && !options.title) options.title = options.item.name
+
+      const normalizedSkills = this.#dedupeList([
+        options.skill,
+        options.skillId,
+        ...(Array.isArray(options.skills) ? options.skills : []),
+        ...(Array.isArray(options.skillsList) ? options.skillsList : [])
+      ])
+
+      if (normalizedSkills.length > 0) {
+        options.skill = normalizedSkills[0]
+        options.skillId = normalizedSkills[0]
+        options.skillKey = options.skillKey ?? normalizedSkills[0]
+        options.skills = normalizedSkills
+        options.skillsList = normalizedSkills
+      }
+
+      const ring = this.#extractRingId(options.ring ?? options.ringId ?? options.ringKey)
+      if (ring) {
+        options.ring = ring
+        options.ringId = ring
+        options.ringKey = ring
+      }
+
+      const resolvedTN = this.#coerceNumber(options.targetNumber)
+        ?? this.#coerceNumber(options.tn)
+        ?? this.#coerceNumber(options.difficulty)
+
+      if (resolvedTN !== null) {
+        options.difficulty = resolvedTN
+        options.tn = resolvedTN
+        options.targetNumber = resolvedTN
+      }
+
+      const diceContext = {}
+      if (normalizedSkills.length > 0) {
+        diceContext.skill = normalizedSkills[0]
+        diceContext.skillId = normalizedSkills[0]
+        diceContext.skillKey = normalizedSkills[0]
+      }
+      if (ring) {
+        diceContext.ring = ring
+        diceContext.ringId = ring
+        diceContext.ringKey = ring
+      }
+      if (resolvedTN !== null) {
+        diceContext.tn = resolvedTN
+        diceContext.difficulty = resolvedTN
+        diceContext.targetNumber = resolvedTN
+      }
+
+      options.action = options.action ? { ...diceContext, ...options.action } : { ...diceContext }
+      options.check = options.check ? { ...diceContext, ...options.check } : { ...diceContext }
+      options.dicePool = options.dicePool ? { ...diceContext, ...options.dicePool } : { ...diceContext }
+      options.pool = options.pool ? { ...diceContext, ...options.pool } : { ...diceContext }
+
+      return options
+    }
+
+    async #trySkillRoll(actor, skillId, options) {
+      if (!actor || !skillId) return false
+
+      const argSets = this.#buildSkillArgSets(skillId, actor, options)
+
+      const handlers = [
+        { fn: actor?.rollSkill, context: actor, argsList: argSets },
+        { fn: actor?.rollSkillCheck, context: actor, argsList: argSets },
+        { fn: actor?.rollSkillTest, context: actor, argsList: argSets },
+        { fn: actor?.rollSkillDicePool, context: actor, argsList: argSets },
+        { fn: actor?.rollCheck, context: actor, argsList: argSets }
+      ]
+
+      if (await this.#executeRollHandlers(handlers)) return true
+
+      const l5r5e = game?.l5r5e ?? {}
+      const helper = l5r5e?.HelpersL5r5e
+      const skillOptions = this.#duplicateOptions(options, { skill: skillId, skillId })
+
+      const globalHandlers = []
+
+      const helperArgSets = [
+        [actor, skillId, this.#duplicateOptions(skillOptions)],
+        [actor, this.#duplicateOptions(skillOptions)],
+        [this.#duplicateOptions(skillOptions)],
+        [{ actor, skill: skillId, options: this.#duplicateOptions(skillOptions) }]
+      ]
+      if (helper) {
+        globalHandlers.push({ fn: helper.rollSkill, context: helper, argsList: helperArgSets })
+      }
+
+      const rollApis = [l5r5e?.Rolls, l5r5e?.Roller, l5r5e?.Dice, l5r5e?.dice, l5r5e?.checks]
+      const methodNames = ['rollSkill', 'skill', 'skillCheck', 'rollCheck', 'rollSkillCheck']
+      for (const api of rollApis) {
+        if (!api) continue
+        for (const methodName of methodNames) {
+          const fn = api?.[methodName]
+          if (typeof fn !== 'function') continue
+          globalHandlers.push({
+            fn,
+            context: api,
+            argsList: [
+              [actor, skillId, this.#duplicateOptions(skillOptions)],
+              [actor, this.#duplicateOptions(skillOptions)],
+              [this.#duplicateOptions(skillOptions)],
+              [{ actor, skill: skillId, options: this.#duplicateOptions(skillOptions) }]
+            ]
+          })
+        }
+      }
+
+      return this.#executeRollHandlers(globalHandlers)
+    }
+
+    async #tryRingRoll(actor, ringId, options) {
+      if (!actor || !ringId) return false
+
+      const argSets = this.#buildRingArgSets(ringId, actor, options)
+
+      const handlers = [
+        { fn: actor?.rollRing, context: actor, argsList: argSets },
+        { fn: actor?.rollRingCheck, context: actor, argsList: argSets },
+        { fn: actor?.rollRingTest, context: actor, argsList: argSets },
+        { fn: actor?.rollRingDicePool, context: actor, argsList: argSets },
+        { fn: actor?.rollCheck, context: actor, argsList: argSets }
+      ]
+
+      if (await this.#executeRollHandlers(handlers)) return true
+
+      const l5r5e = game?.l5r5e ?? {}
+      const helper = l5r5e?.HelpersL5r5e
+      const ringOptions = this.#duplicateOptions(options, { ring: ringId, ringId })
+
+      const helperArgSets = [
+        [actor, ringId, this.#duplicateOptions(ringOptions)],
+        [actor, ringId],
+        [this.#duplicateOptions(ringOptions)],
+        [{ actor, ring: ringId, options: this.#duplicateOptions(ringOptions) }]
+      ]
+      const globalHandlers = []
+      if (helper) {
+        globalHandlers.push({ fn: helper.rollRing, context: helper, argsList: helperArgSets })
+      }
+
+      const rollApis = [l5r5e?.Rolls, l5r5e?.Roller, l5r5e?.Dice, l5r5e?.dice, l5r5e?.checks]
+      const methodNames = ['rollRing', 'ring', 'ringCheck', 'rollRingCheck', 'rollStance', 'stance']
+      for (const api of rollApis) {
+        if (!api) continue
+        for (const methodName of methodNames) {
+          const fn = api?.[methodName]
+          if (typeof fn !== 'function') continue
+          globalHandlers.push({
+            fn,
+            context: api,
+            argsList: [
+              [actor, ringId, this.#duplicateOptions(ringOptions)],
+              [actor, this.#duplicateOptions(ringOptions)],
+              [this.#duplicateOptions(ringOptions)],
+              [{ actor, ring: ringId, options: this.#duplicateOptions(ringOptions) }]
+            ]
+          })
+        }
+      }
+
+      return this.#executeRollHandlers(globalHandlers)
+    }
+
+    async #tryItemRoll(actor, item, options) {
+      if (!item) return false
+
+      const itemArgSets = this.#buildItemArgSets(actor, item, options)
+
+      const itemHandlers = [
+        { fn: item?.roll, context: item, argsList: itemArgSets },
+        { fn: item?.use, context: item, argsList: itemArgSets },
+        { fn: item?.attack, context: item, argsList: itemArgSets },
+        { fn: item?.execute, context: item, argsList: itemArgSets },
+        { fn: item?.activate, context: item, argsList: itemArgSets },
+        { fn: item?.perform, context: item, argsList: itemArgSets },
+        { fn: item?.trigger, context: item, argsList: itemArgSets },
+        { fn: item?.cast, context: item, argsList: itemArgSets },
+        { fn: item?.useItem, context: item, argsList: itemArgSets }
+      ]
+
+      if (await this.#executeRollHandlers(itemHandlers)) return true
+
+      const actorArgSets = [
+        [item, this.#duplicateOptions(options, { item })],
+        [item, this.#duplicateOptions(options, { item, actor })],
+        [this.#duplicateOptions(options, { item })],
+        [{ actor, item, options: this.#duplicateOptions(options, { item }) }],
+        [item]
+      ]
+
+      const actorHandlers = [
+        { fn: actor?.rollItem, context: actor, argsList: actorArgSets },
+        { fn: actor?.useItem, context: actor, argsList: actorArgSets },
+        { fn: actor?.performTechnique, context: actor, argsList: actorArgSets },
+        { fn: actor?.executeTechnique, context: actor, argsList: actorArgSets },
+        { fn: actor?.activateItem, context: actor, argsList: actorArgSets },
+        { fn: actor?.rollWeapon, context: actor, argsList: actorArgSets },
+        { fn: actor?.rollAttack, context: actor, argsList: actorArgSets },
+        { fn: actor?.rollTechnique, context: actor, argsList: actorArgSets },
+        { fn: actor?.useTechnique, context: actor, argsList: actorArgSets }
+      ]
+
+      if (await this.#executeRollHandlers(actorHandlers)) return true
+
+      const l5r5e = game?.l5r5e ?? {}
+      const helper = l5r5e?.HelpersL5r5e
+      const optionsWithItem = this.#duplicateOptions(options, { item })
+      const globalHandlers = []
+
+      const helperArgSets = [
+        [actor, item, this.#duplicateOptions(optionsWithItem)],
+        [item, this.#duplicateOptions(optionsWithItem)],
+        [this.#duplicateOptions(optionsWithItem)],
+        [{ actor, item, options: this.#duplicateOptions(optionsWithItem) }]
+      ]
+      if (helper) {
+        globalHandlers.push({ fn: helper.rollItem, context: helper, argsList: helperArgSets })
+        globalHandlers.push({ fn: helper.rollTechnique, context: helper, argsList: helperArgSets })
+        globalHandlers.push({ fn: helper.rollWeapon, context: helper, argsList: helperArgSets })
+      }
+
+      const rollApis = [l5r5e?.Rolls, l5r5e?.Roller, l5r5e?.Dice, l5r5e?.dice, l5r5e?.checks]
+      const methodNames = ['item', 'rollItem', 'useItem', 'technique', 'rollTechnique', 'weapon', 'rollWeapon', 'attack', 'rollAttack']
+      for (const api of rollApis) {
+        if (!api) continue
+        for (const methodName of methodNames) {
+          const fn = api?.[methodName]
+          if (typeof fn !== 'function') continue
+          globalHandlers.push({
+            fn,
+            context: api,
+            argsList: [
+              [actor, item, this.#duplicateOptions(optionsWithItem)],
+              [item, this.#duplicateOptions(optionsWithItem)],
+              [this.#duplicateOptions(optionsWithItem)],
+              [{ actor, item, options: this.#duplicateOptions(optionsWithItem) }]
+            ]
+          })
+        }
+      }
+
+      return this.#executeRollHandlers(globalHandlers)
+    }
+
+    #buildSkillArgSets(skillId, actor, options) {
+      const base = this.#duplicateOptions(options, { skill: options.skill ?? skillId, skillId: options.skillId ?? skillId, skillKey: options.skillKey ?? skillId })
+      const withActor = this.#duplicateOptions(base, { actor: base.actor ?? actor })
+      return [
+        [skillId, this.#duplicateOptions(base)],
+        [skillId, this.#duplicateOptions(withActor)],
+        [this.#duplicateOptions(base)],
+        [this.#duplicateOptions(withActor)],
+        [{ actor, skill: skillId, options: this.#duplicateOptions(base) }],
+        [skillId],
+        []
+      ]
+    }
+
+    #buildRingArgSets(ringId, actor, options) {
+      const base = this.#duplicateOptions(options, { ring: options.ring ?? ringId, ringId: options.ringId ?? ringId, ringKey: options.ringKey ?? ringId })
+      const withActor = this.#duplicateOptions(base, { actor: base.actor ?? actor })
+      return [
+        [ringId, this.#duplicateOptions(base)],
+        [ringId, this.#duplicateOptions(withActor)],
+        [this.#duplicateOptions(base)],
+        [this.#duplicateOptions(withActor)],
+        [{ actor, ring: ringId, options: this.#duplicateOptions(base) }],
+        [ringId],
+        []
+      ]
+    }
+
+    #buildItemArgSets(actor, item, options) {
+      const base = this.#duplicateOptions(options, { item: options.item ?? item, itemId: options.itemId ?? item?.id, sourceId: options.sourceId ?? item?.id, itemType: options.itemType ?? item?.type })
+      const withActor = this.#duplicateOptions(base, { actor: base.actor ?? actor })
+      return [
+        [this.#duplicateOptions(base)],
+        [this.#duplicateOptions(withActor)],
+        [item, this.#duplicateOptions(base)],
+        [item, this.#duplicateOptions(withActor)],
+        [actor, item, this.#duplicateOptions(base)],
+        [item],
+        []
+      ]
+    }
+
+    async #executeRollHandlers(handlers = []) {
+      for (const handler of handlers) {
+        if (!handler) continue
+        const fn = handler.fn
+        if (typeof fn !== 'function') continue
+        const context = handler.context ?? null
+        const argsList = Array.isArray(handler.argsList) && handler.argsList.length > 0 ? handler.argsList : [[]]
+        for (const args of argsList) {
+          const preparedArgs = Array.isArray(args) ? args : [args]
+          try {
+            const result = await fn.apply(context, preparedArgs)
+            if (handler.validateResult) {
+              if (handler.validateResult(result)) return true
+            } else if (result !== false) {
+              return true
+            }
+          } catch (error) {
+            continue
+          }
+        }
+      }
+      return false
+    }
+
+    #duplicateOptions(options, extra = {}) {
+      return { ...(options ?? {}), ...(extra ?? {}) }
+    }
+
+    #coerceNumber(value) {
+      if (value === null || value === undefined) return null
+      if (typeof value === 'number') return Number.isNaN(value) ? null : value
+      if (typeof value === 'string') {
+        const parsed = Number(value)
+        return Number.isNaN(parsed) ? null : parsed
+      }
+      if (typeof value === 'object') {
+        const keys = ['value', 'current', 'count', 'amount', 'number', 'total']
+        for (const key of keys) {
+          if (!Object.hasOwn(value, key)) continue
+          const result = this.#coerceNumber(value[key])
+          if (result !== null) return result
+        }
+      }
+      return null
+    }
+
+    #resolveDiceDialog() {
+      const candidates = [
+        game?.l5r5e?.DicePickerDialog,
+        game?.l5r5e?.DicePicker,
+        game?.l5r5e?.DicePoolDialog,
+        game?.l5r5e?.Dice?.DicePickerDialog,
+        game?.l5r5e?.Dice?.DicePoolDialog,
+        game?.l5r5e?.apps?.DicePickerDialog,
+        game?.l5r5e?.apps?.DicePoolDialog,
+        game?.l5r5e?.apps?.dice?.DicePickerDialog,
+        game?.l5r5e?.apps?.dice?.DicePoolDialog,
+        game?.l5r5e?.applications?.DicePickerDialog,
+        game?.l5r5e?.applications?.DicePoolDialog,
+        CONFIG?.l5r5e?.DicePickerDialog,
+        CONFIG?.l5r5e?.DicePoolDialog,
+        CONFIG?.l5r5e?.applications?.DicePickerDialog,
+        CONFIG?.l5r5e?.applications?.DicePoolDialog,
+        CONFIG?.l5r5e?.applications?.dice?.DicePickerDialog,
+        CONFIG?.l5r5e?.applications?.dice?.DicePoolDialog
+      ]
+
+      for (const candidate of candidates) {
+        const resolved = this.#resolveConstructor(candidate)
+        if (resolved) return resolved
+      }
+
+      return null
+    }
+
+    #resolveConstructor(candidate) {
+      if (!candidate) return null
+      if (typeof candidate === 'function') return candidate
+      if (typeof candidate === 'object') {
+        const keys = ['DicePickerDialog', 'DicePoolDialog', 'default', 'Dialog', 'Application']
+        for (const key of keys) {
+          if (typeof candidate[key] === 'function') return candidate[key]
+        }
+      }
+      return null
     }
 
     #extractRingId(data) {

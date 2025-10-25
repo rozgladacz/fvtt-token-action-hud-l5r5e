@@ -1,5 +1,5 @@
 
-import { ACTION_TYPE, GROUP, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS } from './constants.js'
+import { ACTION_TYPE, GROUP, ITEM_BONUS, ITEM_PATTERN, ITEM_QUALITIES, ITEM_TAGS, ITEM_TYPE } from './constants.js'
 import { getAttributeEntries, getInventoryGroupEntries, getTechniqueTypeEntries, sanitizeId } from './system-data.js'
 
 export function createActionHandlerClass(api) {
@@ -176,45 +176,40 @@ export function createActionHandlerClass(api) {
      * @private
      */
     async #buildInventory() {
-      if (this.items.size === 0) return
+      if (!this.items || this.items.size === 0) return
 
       const inventoryMap = new Map()
 
-      for (const [key, value] of this.items) {
-        const equipped = value.system.equipped
-        const hasQuantity = value.system?.quantity > 0
-        const isEquippedItem = this.#isEquippedItem(value)
-        const type = value.type
+      const ensureGroup = (groupId) => {
+        if (!groupId) return null
+        if (!inventoryMap.has(groupId)) inventoryMap.set(groupId, new Map())
+        return inventoryMap.get(groupId)
+      }
 
-        // Set items into maps
-        if (hasQuantity) {
-          if (equipped) {
-            if (!inventoryMap.has('equipped')) inventoryMap.set('equipped', new Map())
-            inventoryMap.get('equipped').set(key, value)
-          }
-          if (!equipped) {
-            if (!inventoryMap.has('unequipped')) inventoryMap.set('unequipped', new Map())
-            inventoryMap.get('unequipped').set(key, value)
-          }
-          if (isEquippedItem) {
-            // armor item weapon technique peculiarity
-            if (type === 'item') {
-              if (!inventoryMap.has('equipment')) inventoryMap.set('equipment', new Map())
-              inventoryMap.get('equipment').set(key, value)
-            }
-            if (type === 'weapon') {
-              if (!inventoryMap.has('weapons')) inventoryMap.set('weapons', new Map())
-              inventoryMap.get('weapons').set(key, value)
-            }
-            if (type === 'armor') {
-              if (!inventoryMap.has('armor')) inventoryMap.set('armor', new Map())
-              inventoryMap.get('armor').set(key, value)
-            }
-          }
+      for (const [key, item] of this.items) {
+        const quantity = this.#getItemQuantity(item)
+        if (quantity <= 0) continue
+
+        const equippedState = this.#getEquippedState(item)
+        const isEquipped = equippedState === true
+        const hasEquippedData = equippedState !== null
+
+        if (isEquipped) {
+          ensureGroup('equipped')?.set(key, item)
+        } else if (this.displayUnequipped && (!hasEquippedData || equippedState === false)) {
+          ensureGroup('unequipped')?.set(key, item)
+        }
+
+        if (!this.#shouldIncludeItemInInventory(item, equippedState)) continue
+
+        const groupIds = this.#getInventoryGroupIdsForItem(item)
+        if (groupIds.length === 0) continue
+
+        for (const groupId of groupIds) {
+          ensureGroup(groupId)?.set(key, item)
         }
       }
 
-      // Loop through inventory subcateogry ids
       const knownGroupIds = this.inventoryGroups ? [...this.inventoryGroups.keys()] : []
       const inventoryGroupIds = [...inventoryMap.keys()]
       const groupIds = [...new Set([...knownGroupIds, ...inventoryGroupIds])]
@@ -224,10 +219,267 @@ export function createActionHandlerClass(api) {
         if (!inventory || inventory.size === 0) continue
 
         const groupData = this.#getGroupData(groupId, this.inventoryGroups)
-
-        // Build actions
         await this.#buildActions(inventory, groupData, groupId)
       }
+    }
+
+    #shouldIncludeItemInInventory(item, equippedState) {
+      const typeId = sanitizeId(item?.type)
+      const excludedTypes = new Set(['item', 'technique', 'peculiarity'])
+
+      if (equippedState === true) return true
+
+      if (this.displayUnequipped) {
+        if (equippedState === false) return !excludedTypes.has(typeId)
+        return !excludedTypes.has(typeId)
+      }
+
+      return false
+    }
+
+    #getInventoryGroupIdsForItem(item) {
+      if (!item) return []
+
+      const groups = this.inventoryGroups instanceof Map ? this.inventoryGroups : new Map()
+      const candidates = this.#collectItemTypeCandidates(item)
+      const sanitizedCandidates = new Set(candidates.map((value) => sanitizeId(value)).filter((value) => value))
+
+      const matchedGroupIds = new Set()
+
+      for (const [groupId, entry] of groups.entries()) {
+        const entryCandidates = new Set([
+          sanitizeId(groupId),
+          sanitizeId(entry?.id),
+          sanitizeId(entry?.actorKey),
+          sanitizeId(entry?.type)
+        ].filter((value) => value))
+
+        const aliasSources = [entry?.aliases, entry?.ids, entry?.keys, entry?.types, entry?.values]
+        aliasSources.forEach((source) => {
+          if (!source) return
+          const values = Array.isArray(source) ? source : source instanceof Set ? [...source] : source instanceof Map ? [...source.keys(), ...source.values()] : typeof source === 'object' ? Object.values(source) : [source]
+          values.forEach((value) => {
+            const normalized = sanitizeId(this.#extractIdentifier(value))
+            if (normalized) entryCandidates.add(normalized)
+          })
+        })
+
+        for (const candidate of sanitizedCandidates) {
+          if (entryCandidates.has(candidate)) {
+            matchedGroupIds.add(groupId)
+            break
+          }
+        }
+      }
+
+      if (matchedGroupIds.size > 0) return [...matchedGroupIds]
+
+      return this.#getDefaultInventoryGroupIds(item)
+    }
+
+    #collectItemTypeCandidates(item) {
+      const system = item?.system ?? {}
+      const baseCandidates = [
+        item?.type,
+        system.type,
+        system.itemType,
+        system.item_type,
+        system.inventoryType,
+        system.inventory_type,
+        system.category,
+        system.categoryId,
+        system.category_id,
+        system.group,
+        system.groupId,
+        system.group_id,
+        system.gearType,
+        system.gear_type,
+        system.classification,
+        system.classificationId,
+        system.classification_id,
+        system.subtype,
+        system.sub_type,
+        system.kind,
+        system.technique_type,
+        system.techniqueType
+      ]
+
+      const nestedSources = [system.type, system.category, system.group, system.subtype, system.inventory, system.slot]
+
+      nestedSources.forEach((source) => {
+        if (!source || typeof source !== 'object') return
+        const identifiers = [
+          source.id,
+          source.key,
+          source.type,
+          source.value,
+          source.slug,
+          source.name,
+          source.category,
+          source.categoryId,
+          source.group,
+          source.groupId
+        ]
+        identifiers.forEach((identifier) => {
+          if (identifier !== undefined) baseCandidates.push(identifier)
+        })
+      })
+
+      return baseCandidates
+        .map((value) => this.#extractIdentifier(value))
+        .filter((value) => value)
+    }
+
+    #getDefaultInventoryGroupIds(item) {
+      const typeId = sanitizeId(item?.type)
+      const entry = ITEM_TYPE?.[typeId]
+      if (entry?.groupId) return [entry.groupId]
+      return []
+    }
+
+    #getItemQuantity(item) {
+      if (!item) return 0
+      const quantity = this.#getNumericValue(item?.system?.quantity)
+      if (quantity === null || quantity === undefined) return 1
+      return quantity
+    }
+
+    #getEquippedState(item) {
+      if (!item) return null
+
+      const direct = this.#resolveBoolean(item?.system?.equipped)
+      if (direct !== null) return direct
+
+      const system = item.system ?? {}
+      const candidates = [
+        system.readied,
+        system.isEquipped,
+        system.equippedStatus,
+        system.status?.equipped,
+        system.state?.equipped,
+        system.attributes?.equipped,
+        system.equipped_state,
+        system.worn,
+        system.active
+      ]
+
+      for (const candidate of candidates) {
+        const value = this.#resolveBoolean(candidate)
+        if (value !== null) return value
+      }
+
+      return null
+    }
+
+    #resolveBoolean(value) {
+      if (value === null || value === undefined) return null
+      if (typeof value === 'boolean') return value
+      if (typeof value === 'number') return value !== 0
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase()
+        if (['true', '1', 'yes', 'equipped', 'active', 'enabled', 'ready', 'readied', 'worn'].includes(normalized)) return true
+        if (['false', '0', 'no', 'unequipped', 'inactive', 'disabled'].includes(normalized)) return false
+      }
+      if (typeof value === 'object') {
+        const keys = ['value', 'equipped', 'isEquipped', 'active', 'enabled', 'state', 'status', 'worn', 'ready', 'readied']
+        for (const key of keys) {
+          if (!Object.hasOwn(value, key)) continue
+          const result = this.#resolveBoolean(value[key])
+          if (result !== null) return result
+        }
+      }
+      return null
+    }
+
+    #getNumericValue(value) {
+      if (value === null || value === undefined) return null
+      if (typeof value === 'number') return value
+      if (typeof value === 'string') {
+        const parsed = Number(value)
+        return Number.isNaN(parsed) ? null : parsed
+      }
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          const result = this.#getNumericValue(entry)
+          if (result !== null && result !== undefined) return result
+        }
+        return null
+      }
+      if (value instanceof Set) {
+        for (const entry of value.values()) {
+          const result = this.#getNumericValue(entry)
+          if (result !== null && result !== undefined) return result
+        }
+        return null
+      }
+      if (value instanceof Map) {
+        for (const entry of value.values()) {
+          const result = this.#getNumericValue(entry)
+          if (result !== null && result !== undefined) return result
+        }
+        return null
+      }
+      if (typeof value === 'object') {
+        const keys = ['value', 'current', 'count', 'number', 'amount', 'quantity', 'total', 'max', 'min']
+        for (const key of keys) {
+          if (!Object.hasOwn(value, key)) continue
+          const nested = value[key]
+          if (nested === value) continue
+          const result = this.#getNumericValue(nested)
+          if (result !== null && result !== undefined) return result
+        }
+      }
+      return null
+    }
+
+    #extractIdentifier(value) {
+      if (value === null || value === undefined) return null
+      if (typeof value === 'string' || typeof value === 'number') return String(value)
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          const result = this.#extractIdentifier(entry)
+          if (result) return result
+        }
+        return null
+      }
+      if (value instanceof Set) {
+        for (const entry of value.values()) {
+          const result = this.#extractIdentifier(entry)
+          if (result) return result
+        }
+        return null
+      }
+      if (value instanceof Map) {
+        for (const entry of value.values()) {
+          const result = this.#extractIdentifier(entry)
+          if (result) return result
+        }
+        return null
+      }
+      if (typeof value === 'object') {
+        const keys = ['id', 'key', 'value', 'type', 'slug', 'name', 'category', 'categoryId', 'group', 'groupId']
+        for (const key of keys) {
+          if (!Object.hasOwn(value, key)) continue
+          const result = this.#extractIdentifier(value[key])
+          if (result) return result
+        }
+      }
+      return null
+    }
+
+    #getItemByIdentifier(identifier) {
+      if (!identifier) return null
+      if (this.items?.has(identifier)) return this.items.get(identifier)
+
+      if (typeof identifier === 'string') {
+        const normalized = identifier.includes('.') ? identifier.split('.').pop() : identifier
+        if (normalized && this.items?.has(normalized)) return this.items.get(normalized)
+
+        const uuidMatch = [...this.items.values()].find((item) => item?.uuid === identifier)
+        if (uuidMatch) return uuidMatch
+      }
+
+      return null
     }
 
     /**
@@ -782,11 +1034,11 @@ export function createActionHandlerClass(api) {
         const isTechnique = this.#isTechnique(value)
 
         if (isTechnique) {
-          const technique_type = sanitizeId(value.system.technique_type)
-          if (!technique_type) continue
+          const techniqueType = this.#getTechniqueTypeId(value) ?? sanitizeId(value.type)
+          if (!techniqueType) continue
 
-          if (!techniqueMap.has(technique_type)) techniqueMap.set(technique_type, new Map())
-          techniqueMap.get(technique_type).set(key, value)
+          if (!techniqueMap.has(techniqueType)) techniqueMap.set(techniqueType, new Map())
+          techniqueMap.get(techniqueType).set(key, value)
         }
       }
 
@@ -845,15 +1097,6 @@ export function createActionHandlerClass(api) {
      * @param {object} item
      * @returns {boolean}
      */
-    #isEquippedItem(item) {
-      const type = item.type
-      const excludedTypes = ['item', 'technique', 'peculiarity']
-      if (this.displayUnequipped && !excludedTypes.includes(type)) return true
-      const equipped = item.system.equipped
-      if (equipped) return true
-      return false
-    }
-
     /**
      * Is readied item
      * @private
@@ -861,16 +1104,42 @@ export function createActionHandlerClass(api) {
      * @returns {boolean}
      */
     #isTechnique(item) {
-      const type = item.type
+      if (!item) return false
 
-      if (type !== 'technique') return false
+      const typeId = sanitizeId(item.type)
+      const techniqueTypeId = this.#getTechniqueTypeId(item)
 
-      if (!this.techniqueTypeKeys || this.techniqueTypeKeys.size === 0) return true
+      if (!this.techniqueTypeKeys || this.techniqueTypeKeys.size === 0) {
+        return typeId === 'technique' || !!techniqueTypeId
+      }
 
-      const techniqueType = item.system.technique_type
-      if (!techniqueType) return false
+      if (typeId && this.techniqueTypeKeys.has(typeId)) return true
 
-      return this.techniqueTypeKeys.has(techniqueType) || this.techniqueTypeKeys.has(sanitizeId(techniqueType))
+      if (techniqueTypeId && this.techniqueTypeKeys.has(techniqueTypeId)) return true
+
+      return false
+    }
+
+    #getTechniqueTypeId(item) {
+      if (!item) return null
+
+      const system = item.system ?? {}
+      const candidates = [
+        system.technique_type,
+        system.techniqueType,
+        system.technique?.type,
+        system.type,
+        system.category,
+        system.group,
+        system.subtype
+      ]
+
+      for (const candidate of candidates) {
+        const value = this.#extractIdentifier(candidate)
+        if (value) return sanitizeId(value)
+      }
+
+      return null
     }
 
     #buildDerivedAttributes() {
@@ -1205,8 +1474,9 @@ export function createActionHandlerClass(api) {
      * @returns {string}
      */
     #getQuantityData(item) {
-      const quantity = item?.system?.quantity ?? 0
-      return (quantity > 1) ? quantity : ''
+      const quantity = this.#getNumericValue(item?.system?.quantity)
+      if (quantity === null || quantity === undefined) return ''
+      return quantity > 1 ? quantity : ''
     }
 
     /**
@@ -1216,9 +1486,19 @@ export function createActionHandlerClass(api) {
      * @returns {string}
      */
     #getUsesData(item) {
-      const uses = item?.system?.uses
+      const uses = item?.system?.uses ?? item?.system?.ammo
       if (!uses) return ''
-      return (uses.value > 0 || uses.max > 0) ? `${uses.value ?? '0'}${(uses.max > 0) ? `/${uses.max}` : ''}` : ''
+
+      const current = this.#getNumericValue(uses.value ?? uses.current ?? uses.count ?? uses)
+      const max = this.#getNumericValue(uses.max ?? uses.total ?? uses.capacity)
+
+      const hasCurrent = current !== null && current !== undefined
+      const hasMax = max !== null && max !== undefined && max > 0
+
+      if (!hasCurrent && !hasMax) return ''
+
+      const currentText = hasCurrent ? current : 0
+      return hasMax ? `${currentText}/${max}` : `${currentText}`
     }
 
     /**
@@ -1230,31 +1510,79 @@ export function createActionHandlerClass(api) {
      */
     #getConsumeData(item) {
       // Get consume target and type
-      const consumeId = item?.system?.consume?.target
-      const consumeType = item?.system?.consume?.type
+      const consume = item?.system?.consume ?? {}
+      const consumeId = consume?.target ?? consume?.id ?? consume?.uuid
+      const consumeType = consume?.type ?? consume?.mode
 
-      if (consumeId === item.id) return ''
+      if (consumeId === item.id || consumeId === item.uuid) return ''
 
       // Return resources
       if (consumeType === 'attribute') {
         if (!consumeId) return ''
-        const parentId = consumeId.substr(0, consumeId.lastIndexOf('.'))
-        const target = this.actor.system[parentId]
 
-        return (target) ? `${target.value ?? '0'}${(target.max) ? `/${target.max}` : ''}` : ''
+        const system = this.actor?.system ?? {}
+        const cleanPath = String(consumeId).startsWith('system.')
+          ? String(consumeId).slice(7)
+          : String(consumeId)
+
+        let target = this.#getProperty(system, cleanPath)
+
+        if (!target && cleanPath.includes('.')) {
+          const parentPath = cleanPath.substring(0, cleanPath.lastIndexOf('.'))
+          target = this.#getProperty(system, parentPath)
+        }
+
+        if (!target && !cleanPath.includes('.')) {
+          const altPaths = [
+            `attributes.${cleanPath}`,
+            `attributes.derived.${cleanPath}`,
+            `attributes.standing.${cleanPath}`,
+            `derived.${cleanPath}`,
+            `standing.${cleanPath}`,
+            cleanPath
+          ]
+
+          for (const path of altPaths) {
+            target = this.#getProperty(system, path)
+            if (target) break
+          }
+        }
+
+        if (!target) return ''
+
+        const current = this.#getNumericValue(target?.value ?? target?.current ?? target)
+        const max = this.#getNumericValue(target?.max ?? target?.maximum ?? target?.limit)
+
+        if (max !== null && max !== undefined && max > 0) {
+          return `${current ?? 0}/${max}`
+        }
+
+        return current !== null && current !== undefined ? `${current}` : ''
       }
 
-      const target = this.items.get(consumeId)
+      const target = this.#getItemByIdentifier(consumeId)
 
       // Return charges
       if (consumeType === 'charges') {
-        const uses = target?.system.uses
+        const uses = target?.system?.uses ?? target?.system?.ammo
+        if (!uses) return ''
 
-        return (uses?.value) ? `${uses.value}${(uses.max) ? `/${uses.max}` : ''}` : ''
+        const current = this.#getNumericValue(uses.value ?? uses.current ?? uses)
+        const max = this.#getNumericValue(uses.max ?? uses.total ?? uses.capacity)
+
+        if (current === null && max === null) return ''
+
+        if (max !== null && max !== undefined && max > 0) {
+          return `${current ?? 0}/${max}`
+        }
+
+        return current !== null && current !== undefined ? `${current}` : ''
       }
 
       // Return quantity
-      return target?.system?.quantity ?? ''
+      const quantity = this.#getNumericValue(target?.system?.quantity)
+      if (quantity === null || quantity === undefined) return ''
+      return quantity > 0 ? `${quantity}` : ''
     }
 
     async #getTooltipData(entity) {
