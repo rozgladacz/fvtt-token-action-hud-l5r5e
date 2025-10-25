@@ -22,7 +22,17 @@ export const REQUIRED_CORE_MODULE_VERSION = '2.0.12'
  */
 export const ACTION_TYPE = {
   item: 'tokenActionHud.template.item',
-  utility: 'tokenActionHud.utility'
+  utility: 'tokenActionHud.utility',
+  armor: 'l5r5e.armors.title',
+  equipped: 'tokenActionHud.equipped',
+  unequipped: 'tokenActionHud.unequipped',
+  equipment: 'l5r5e.items.title',
+  weapons: 'l5r5e.weapons.title',
+  technique: 'l5r5e.techniques.title',
+  ring: 'l5r5e.rings.title',
+  skill: 'l5r5e.skills.title',
+  derived: 'l5r5e.attributes.title',
+  standing: 'l5r5e.social.title'
 }
 
 /**
