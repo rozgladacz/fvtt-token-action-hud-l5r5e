@@ -1,10 +1,8 @@
 import { ACTION_TYPE } from './constants.js'
 import { Utils } from './utils.js'
-import { getCoreApi } from './core-api.js'
 
-const coreApi = getCoreApi()
-
-export class ActionHandler extends coreApi.ActionHandler {
+export function createActionHandlerClass(api) {
+  return class ActionHandler extends api.ActionHandler {
     /**
      * Build system actions
      * Called by Token Action HUD Core
@@ -30,7 +28,7 @@ export class ActionHandler extends coreApi.ActionHandler {
       // Set items variable
       if (this.actor) {
         let items = this.actor.items
-        items = coreApi.Utils.sortItemsByName(items)
+        items = api.Utils.sortItemsByName(items)
         this.items = items
       }
 
@@ -128,9 +126,9 @@ export class ActionHandler extends coreApi.ActionHandler {
 
       // Create group name mappings
       const groupNameMappings = {
-        equipment: coreApi.Utils.i18n('l5r5e.items.title'),
-        armor: coreApi.Utils.i18n('l5r5e.armors.title'),
-        weapons: coreApi.Utils.i18n('l5r5e.weapons.title')
+        equipment: api.Utils.i18n('l5r5e.items.title'),
+        armor: api.Utils.i18n('l5r5e.armors.title'),
+        weapons: api.Utils.i18n('l5r5e.weapons.title')
       }
 
       // Loop through inventory subcateogry ids
@@ -170,7 +168,7 @@ export class ActionHandler extends coreApi.ActionHandler {
       // Create group data
       const groupData = {
         id: 'rings',
-        name: `${coreApi.Utils.i18n(`l5r5e.rings.title`)}` ?? 'rings',
+        name: `${api.Utils.i18n(`l5r5e.rings.title`)}` ?? 'rings',
         type: 'system'
       }
 
@@ -180,12 +178,12 @@ export class ActionHandler extends coreApi.ActionHandler {
           try {
             const id = ring.id
             const encodedValue = [actionType, id].join(this.delimiter)
-            const name = `${coreApi.Utils.i18n(`l5r5e.rings.${id}`)}: ${ring.value}` ?? ''
+            const name = `${api.Utils.i18n(`l5r5e.rings.${id}`)}: ${ring.value}` ?? ''
             const actionTypeName = `${ring.label}:` ?? ''
             const listName = `${actionTypeName}${name}`
-            const img = coreApi.Utils.getImage(`systems/l5r5e/assets/icons/rings/${id}.svg`)
+            const img = api.Utils.getImage(`systems/l5r5e/assets/icons/rings/${id}.svg`)
 
-            const tooltip = `${coreApi.Utils.i18n(`l5r5e.conflict.stances.${id}tip`)}`
+            const tooltip = `${api.Utils.i18n(`l5r5e.conflict.stances.${id}tip`)}`
 
             let cssClass = ''
             if (id === stance) {
@@ -202,7 +200,7 @@ export class ActionHandler extends coreApi.ActionHandler {
               listName
             }
           } catch (error) {
-            coreApi.Logger.error(ring)
+            api.Logger.error(ring)
             return null
           }
         })
@@ -227,7 +225,7 @@ export class ActionHandler extends coreApi.ActionHandler {
           // Create group data
           const groupData = {
             id: catId,
-            name: `${coreApi.Utils.i18n(`l5r5e.skills.${catId}.title`)}` ?? catId,
+            name: `${api.Utils.i18n(`l5r5e.skills.${catId}.title`)}` ?? catId,
             type: 'system'
           }
 
@@ -236,8 +234,8 @@ export class ActionHandler extends coreApi.ActionHandler {
             const id = skill[1]
             const encodedValue = [actionType, id].join(this.delimiter)
             const value = this.actor.system.skills[catId][id]
-            const name = `${coreApi.Utils.i18n(`l5r5e.skills.${catId}.${id}`)}: ${value}` ?? ''
-            const actionTypeName = `${coreApi.Utils.i18n('l5r5e.skills.label')}: ` ?? ''
+            const name = `${api.Utils.i18n(`l5r5e.skills.${catId}.${id}`)}: ${value}` ?? ''
+            const actionTypeName = `${api.Utils.i18n('l5r5e.skills.label')}: ` ?? ''
             const listName = `${actionTypeName}${name}`
 
             return {
@@ -252,7 +250,7 @@ export class ActionHandler extends coreApi.ActionHandler {
           this.addActions(actions, groupData)
 
         } catch (error) {
-          coreApi.Logger.error(catId)
+          api.Logger.error(catId)
           return null
         }
 
@@ -303,7 +301,7 @@ export class ActionHandler extends coreApi.ActionHandler {
     */
     #getActors() {
       const allowedTypes = ['character', 'npc']
-      const tokens = coreApi.Utils.getControlledTokens()
+      const tokens = api.Utils.getControlledTokens()
       const actors = tokens?.filter(token => token.actor).map((token) => token.actor)
       if (actors.every((actor) => allowedTypes.includes(actor.type))) {
         return actors
@@ -319,7 +317,7 @@ export class ActionHandler extends coreApi.ActionHandler {
      */
     #getTokens() {
       const allowedTypes = ['character', 'npc']
-      const tokens = coreApi.Utils.getControlledTokens()
+      const tokens = api.Utils.getControlledTokens()
       const actors = tokens?.filter(token => token.actor).map((token) => token.actor)
       if (actors.every((actor) => allowedTypes.includes(actor.type))) {
         return tokens
@@ -393,7 +391,7 @@ export class ActionHandler extends coreApi.ActionHandler {
       const id = entity.id ?? entity._id
       let name = entity?.name ?? entity?.label
 
-      const actionTypeName = `${coreApi.Utils.i18n(ACTION_TYPE[actionType])}: ` ?? ''
+      const actionTypeName = `${api.Utils.i18n(ACTION_TYPE[actionType])}: ` ?? ''
       const listName = `${actionTypeName}${name}`
 
       let cssClass = ''
@@ -404,7 +402,7 @@ export class ActionHandler extends coreApi.ActionHandler {
       }
 
       const encodedValue = [actionType, id].join(this.delimiter)
-      const img = coreApi.Utils.getImage(entity)
+      const img = api.Utils.getImage(entity)
       const icon1 = this.#getActivationTypeIcon(entity?.system?.activation?.type)
       let icon2 = null
       let info = this.#getItemInfo(entity)
@@ -562,14 +560,14 @@ export class ActionHandler extends coreApi.ActionHandler {
       if (this.tooltipsSetting === 'none') return ''
       if (typeof tooltipData === 'string') return tooltipData
 
-      const name = coreApi.Utils.i18n(tooltipData.name)
+      const name = api.Utils.i18n(tooltipData.name)
 
       if (this.tooltipsSetting === 'nameOnly') return name
 
       const nameHtml = `<h3>${name}</h3>`
 
       const description = tooltipData?.descriptionLocalised ??
-        await TextEditor.enrichHTML(coreApi.Utils.i18n(tooltipData?.description ?? ''), { async: true })
+        await TextEditor.enrichHTML(api.Utils.i18n(tooltipData?.description ?? ''), { async: true })
 
       const rarityHtml = tooltipData?.rarity
         ? `<div class="tah-tags-wrapper"><span class="tah-tag ${this.#getItemRarity(tooltipData.rarity)}">Rarity: ${tooltipData.rarity}</span></div>`
@@ -607,21 +605,23 @@ export class ActionHandler extends coreApi.ActionHandler {
     }
 
     #getWeaponStats(tooltipData) {
-      const range = `<span class="tah-tag">${coreApi.Utils.i18n(`l5r5e.weapons.range`)}: ${tooltipData.range}</span>`
-      const damage = `<span class="tah-tag">${coreApi.Utils.i18n(`l5r5e.weapons.damage`)}: ${tooltipData.damage}</span>`
-      const deadliness = `<span class="tah-tag">${coreApi.Utils.i18n(`l5r5e.weapons.deadliness`)}: ${tooltipData.deadliness}</span>`
+      const range = `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.range`)}: ${tooltipData.range}</span>`
+      const damage = `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.damage`)}: ${tooltipData.damage}</span>`
+      const deadliness = `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.deadliness`)}: ${tooltipData.deadliness}</span>`
       return [range, damage, deadliness].join('')
     }
 
     #getGripMod(tooltipData) {
-      const grip1 = tooltipData.grip1 && tooltipData.grip1 !== 'N/A' ? `<span class="tah-tag">${coreApi.Utils.i18n(`l5r5e.weapons.1hand`)}: ${tooltipData.grip1}</span>` : ''
-      const grip2 = tooltipData.grip2 && tooltipData.grip2 !== 'N/A' ? `<span class="tah-tag">${coreApi.Utils.i18n(`l5r5e.weapons.2hand`)}: ${tooltipData.grip2}</span>` : ''
+      const grip1 = tooltipData.grip1 && tooltipData.grip1 !== 'N/A' ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.1hand`)}: ${tooltipData.grip1}</span>` : ''
+      const grip2 = tooltipData.grip2 && tooltipData.grip2 !== 'N/A' ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.weapons.2hand`)}: ${tooltipData.grip2}</span>` : ''
       return [grip1, grip2].join('')
     }
 
     #getArmorStats(tooltipData) {
-      const physical = tooltipData?.physical && tooltipData?.physical > 0 ? `<span class="tah-tag">${coreApi.Utils.i18n(`l5r5e.armors.physical`)}: ${tooltipData?.physical}</span>` : ''
-      const supernatural = tooltipData?.supernatural && tooltipData?.supernatural > 0 ? `<span class="tah-tag">${coreApi.Utils.i18n(`l5r5e.armors.supernatural`)}: ${tooltipData?.supernatural}</span>` : ''
+      const physical = tooltipData?.physical && tooltipData?.physical > 0 ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.armors.physical`)}: ${tooltipData?.physical}</span>` : ''
+      const supernatural = tooltipData?.supernatural && tooltipData?.supernatural > 0 ? `<span class="tah-tag">${api.Utils.i18n(`l5r5e.armors.supernatural`)}: ${tooltipData?.supernatural}</span>` : ''
       return [physical, supernatural].join('')
     }
+  
   }
+}

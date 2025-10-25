@@ -1,17 +1,16 @@
-import { SystemManager } from './system-manager.js'
+import { createSystemManagerClass } from './system-manager.js'
 import { MODULE, REQUIRED_CORE_MODULE_VERSION } from './constants.js'
-import { getCoreApi } from './core-api.js'
 
-Hooks.once('init', () => {
+Hooks.once('tokenActionHudCoreApiReady', (api) => {
   try {
-    const coreApi = getCoreApi()
-
-    if (typeof coreApi.registerSystem !== 'function') {
+    if (typeof api.registerSystem !== 'function') {
       console.error('Token Action HUD Core API does not provide registerSystem. Please update Token Action HUD Core to version 2.x.')
       return
     }
 
-    coreApi.registerSystem({
+    const SystemManager = createSystemManagerClass(api)
+
+    api.registerSystem({
       moduleId: MODULE.ID,
       requiredCoreModuleVersion: REQUIRED_CORE_MODULE_VERSION,
       SystemManager
