@@ -90,3 +90,12 @@
   border-color: #9d0289;
   background-color: #9d0289;
 }
+
+/* Hide the Select Movement Action button which is not used in L5R5e */
+.tah-action[aria-label="Select Movement Action"],
+.tah-action[data-action-name="Select Movement Action"],
+.tah-action button[aria-label="Select Movement Action"],
+.tah-action button[data-action-name="Select Movement Action"],
+.tah-action button[title="Select Movement Action"] {
+  display: none !important;
+}
