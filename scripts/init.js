@@ -14,6 +14,16 @@ function registerWithCore(payload) {
 
   if (!api) {
     console.error('Token Action HUD Core API is not available. Ensure Token Action HUD Core 2.x is installed and active.')
+
+    if (coreApiHookRegistered) {
+      coreApiHookRegistered = false
+    }
+
+    if (!coreApiHookRegistered) {
+      coreApiHookRegistered = true
+      Hooks.once('tokenActionHudCoreApiReady', (apiPayload) => registerWithCore(apiPayload))
+    }
+
     return
   }
 
