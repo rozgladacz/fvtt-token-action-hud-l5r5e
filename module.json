@@ -58,7 +58,7 @@
         "id": "token-action-hud-core",
         "type": "module",
         "compatibility": {
-          "minimum": "2.0.12"
+          "minimum": "2.0"
         },
         "manifest": "https://raw.githubusercontent.com/Larkinabout/fvtt-token-action-hud-core/master/module.json"
       },
