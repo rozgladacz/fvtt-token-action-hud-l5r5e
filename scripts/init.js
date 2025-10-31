@@ -1,77 +1,59 @@
 import { createSystemManagerClass } from './system-manager.js'
 import { MODULE, REQUIRED_CORE_MODULE_VERSION } from './constants.js'
-import { resolveCoreApi } from './core-api.js'
+let systemReady = false
 
-let systemRegistered = false
-let coreApiHookRegistered = false
-
-function registerWithCore(payload) {
-  if (systemRegistered) {
+function registerSystemWithCore(payload = {}) {
+  if (systemReady) {
     return
   }
 
-  const api = resolveCoreApi(payload)
+  const coreApi = payload.api ?? game.modules.get('token-action-hud-core')?.api
 
-  if (!api) {
+  if (!coreApi) {
     console.error('Token Action HUD Core API is not available. Ensure Token Action HUD Core 2.x is installed and active.')
-
-    if (coreApiHookRegistered) {
-      coreApiHookRegistered = false
-    }
-
-    if (!coreApiHookRegistered) {
-      coreApiHookRegistered = true
-      Hooks.once('tokenActionHudCoreApiReady', (apiPayload) => registerWithCore(apiPayload))
-    }
-
     return
   }
 
   try {
-    const SystemManager = createSystemManagerClass(api)
-    const registrationPayload = {
-      moduleId: MODULE.ID,
+    const SystemManager = createSystemManagerClass(coreApi)
+    const moduleInstance = game.modules.get(MODULE.ID)
+
+    if (!moduleInstance) {
+      console.error('Token Action HUD L5R5E module could not be found in the game module registry.')
+      return
+    }
+
+    moduleInstance.api = {
       requiredCoreModuleVersion: REQUIRED_CORE_MODULE_VERSION,
       SystemManager
     }
 
-    if (typeof api.registerSystem === 'function') {
-      api.registerSystem(registrationPayload)
-    } else if (typeof api.registerApi === 'function') {
-      api.registerApi(registrationPayload)
-    } else {
-      console.error('Token Action HUD Core API does not provide registerSystem or registerApi. Please update Token Action HUD Core to version 2.x.')
-      return
-    }
+    systemReady = true
 
-    systemRegistered = true
-    coreApiHookRegistered = false
+    Hooks.call('tokenActionHudSystemReady', moduleInstance)
   } catch (error) {
     console.error('Failed to register Token Action HUD L5R5E system with Token Action HUD Core.', error)
   }
 }
 
-function prepareRegistration() {
-  if (systemRegistered) {
+function ensureRegistration() {
+  if (systemReady) {
     return
   }
 
-  const api = resolveCoreApi()
-  if (api) {
-    registerWithCore(api)
-    return
-  }
+  const coreApi = game.modules.get('token-action-hud-core')?.api
 
-  if (!coreApiHookRegistered) {
-    coreApiHookRegistered = true
-    Hooks.once('tokenActionHudCoreApiReady', registerWithCore)
+  if (coreApi) {
+    registerSystemWithCore({ api: coreApi })
   }
 }
 
+Hooks.on('tokenActionHudCoreApiReady', registerSystemWithCore)
+
 Hooks.once('init', () => {
-  prepareRegistration()
+  ensureRegistration()
 })
 
 Hooks.once('ready', () => {
-  prepareRegistration()
+  ensureRegistration()
 })
