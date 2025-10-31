@@ -20,27 +20,50 @@ export function getCoreApiIfAvailable() {
   return game.modules.get(CORE_MODULE.ID)?.api ?? null
 }
 
-function hasRegistrationMethods(api) {
-  return typeof api?.registerSystem === 'function' || typeof api?.registerApi === 'function'
+const CORE_API_CLASS_KEYS = ['SystemManager', 'ActionHandler', 'RollHandler']
+
+function hasRequiredCoreClasses(api) {
+  if (!api || typeof api !== 'object') {
+    return false
+  }
+
+  return CORE_API_CLASS_KEYS.every((key) => typeof api[key] === 'function')
+}
+
+function getCoreModuleSafely() {
+  try {
+    return getCoreModule()
+  } catch {
+    return null
+  }
+}
+
+function resolveCoreApiCandidate(candidate) {
+  if (hasRequiredCoreClasses(candidate)) {
+    return candidate
+  }
+
+  if (hasRequiredCoreClasses(candidate?.api)) {
+    return candidate.api
+  }
+
+  return null
 }
 
 export function resolveCoreApi(payload = null) {
-  const coreApi = getCoreApiIfAvailable()
-
-  if (hasRegistrationMethods(payload)) {
-    return payload
+  const payloadApi = resolveCoreApiCandidate(payload)
+  if (payloadApi) {
+    return payloadApi
   }
 
-  if (hasRegistrationMethods(payload?.api)) {
-    return payload.api
-  }
-
-  if (hasRegistrationMethods(coreApi)) {
+  const coreApi = resolveCoreApiCandidate(getCoreApiIfAvailable())
+  if (coreApi) {
     return coreApi
   }
 
-  if (hasRegistrationMethods(coreApi?.api)) {
-    return coreApi.api
+  const coreModuleApi = resolveCoreApiCandidate(getCoreModuleSafely()?.api)
+  if (coreModuleApi) {
+    return coreModuleApi
   }
 
   return null
