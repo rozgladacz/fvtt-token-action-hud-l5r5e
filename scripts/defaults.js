@@ -103,6 +103,15 @@ function buildDefaults(payload) {
   defaultsHookRegistered = false
 }
 
+export function initialiseDefaults(payload) {
+  if (payload) {
+    buildDefaults(payload)
+    return
+  }
+
+  prepareDefaults()
+}
+
 function prepareDefaults() {
   if (defaultsInitialised) {
     return
