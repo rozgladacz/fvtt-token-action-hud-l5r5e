@@ -1,5 +1,6 @@
 import { createSystemManagerClass } from './system-manager.js'
 import { MODULE, REQUIRED_CORE_MODULE_VERSION } from './constants.js'
+import { initialiseDefaults } from './defaults.js'
 let systemReady = false
 
 function registerSystemWithCore(payload = {}) {
@@ -29,6 +30,8 @@ function registerSystemWithCore(payload = {}) {
     }
 
     systemReady = true
+
+    initialiseDefaults(coreApi)
 
     Hooks.call('tokenActionHudSystemReady', moduleInstance)
   } catch (error) {
